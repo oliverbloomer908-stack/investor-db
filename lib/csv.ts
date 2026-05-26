@@ -16,18 +16,18 @@ export interface ColumnMapping {
 }
 
 const FIELD_ALIASES: Record<string, string[]> = {
-  firstName: ['first name', 'firstname', 'person first name', 'first'],
-  lastName: ['last name', 'lastname', 'person last name', 'last'],
-  linkedInUrl: ['linkedin', 'linkedin url', 'person linkedin', 'linkedin profile', 'profile url'],
-  description: ['description', 'person description', 'bio', 'about', 'summary'],
-  location: ['location', 'person location', 'city', 'address'],
-  seniority: ['seniority', 'person seniority', 'level', 'person level'],
-  title: ['title', 'person title', 'job title', 'role'],
-  industries: ['industries', 'industry', 'sectors', 'ocean.io'],
-  companyName: ['company', 'company name', 'organization'],
-  companyDescription: ['company description', 'org description', 'company bio'],
-  domain: ['domain', 'website', 'company website', 'domain name'],
-  email: ['email', 'e-mail', 'contact email', 'person email'],
+  firstName: ['first name', 'firstname', 'person first name', 'first', 'fname', 'given name', 'given_name'],
+  lastName: ['last name', 'lastname', 'person last name', 'last', 'lname', 'surname', 'family name', 'family_name', 'client last name'],
+  linkedInUrl: ['linkedin', 'linkedin url', 'linkedin profile', 'linkedin link', 'profile', 'person linkedin', 'person linkedin url', 'linkedinid', 'li_url', 'linkedin_profile'],
+  description: ['description', 'person description', 'bio', 'about', 'summary', 'person bio', 'bio_short'],
+  location: ['location', 'person location', 'city', 'address', 'region'],
+  seniority: ['seniority', 'person seniority', 'level', 'seniority level', 'job level', 'c-level', 'executive level', 'person level'],
+  title: ['title', 'person title', 'job title', 'job_title', 'position', 'role', 'designation'],
+  industries: ['industries', 'industry', 'sectors', 'sector', 'category', 'focus', 'ocean.io'],
+  companyName: ['company', 'company name', 'organization', 'org', 'firm', 'employer', 'company organization'],
+  companyDescription: ['company description', 'org description', 'company bio', 'company about'],
+  domain: ['domain', 'website', 'company website', 'domain name', 'company website url'],
+  email: ['email', 'e-mail', 'contact email', 'contact e-mail', 'email address', 'email_address'],
 };
 
 export function detectColumns(headers: string[]): { mapping: ColumnMapping; unmapped: string[] } {

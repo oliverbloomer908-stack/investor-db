@@ -39,11 +39,24 @@ export async function POST(req: NextRequest) {
 
     const insertMany = db.transaction((rows: Record<string, string>[]) => {
       let inserted = 0;
-      for (const row of rows) {
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
         const inv = mapRowToInvestor(row, mapping as ColumnMapping);
-        if (!inv.linkedInUrl) continue;
+        let linkedInUrl = inv.linkedInUrl;
+
+        // Fallback: if no linkedInUrl but email exists, generate from email
+        if (!linkedInUrl && inv.email) {
+          const emailHash = inv.email.replace(/[^a-zA-Z0-9]/g, '').toLowerCase().slice(0, 20);
+          linkedInUrl = `https://linkedin.com/in/email-${emailHash}`;
+        }
+        // Fallback: if still no linkedInUrl, construct from location + firstName + lastName
+        if (!linkedInUrl) {
+          const parts = [inv.location, inv.firstName, inv.lastName].filter(Boolean);
+          linkedInUrl = `https://linkedin.com/in/unknown-${parts.join('-').replace(/[^a-zA-Z0-9-]/g, '-')}-${i + 1}`;
+        }
+
         insert.run(
-          inv.linkedInUrl, inv.firstName || '', inv.lastName || '', inv.description || '',
+          linkedInUrl, inv.firstName || '', inv.lastName || '', inv.description || '',
           inv.location || '', inv.seniority || '', inv.title || '', inv.industries || '',
           inv.companyName || '', inv.companyDescription || '', inv.domain || '', inv.email || null
         );
