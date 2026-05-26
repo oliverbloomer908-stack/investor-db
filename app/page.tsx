@@ -32,11 +32,6 @@ export default function Home() {
 
   return (
     <main className="app">
-      <header className="app-header">
-        <h1>Investor Intelligence</h1>
-        <p>Import your CSV, filter, and ask AI to surface the best-fit investors</p>
-      </header>
-
       <div className="layout">
         <aside className="sidebar">
           <ImportCSV />
