@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createHash } from 'crypto';
 import { initDb } from '@/lib/db';
 import { parseCSV, detectColumns, mapRowToInvestor } from '@/lib/csv';
 import { ColumnMapping } from '@/lib/csv';
@@ -46,13 +47,16 @@ export async function POST(req: NextRequest) {
 
         // Fallback: if no linkedInUrl but email exists, generate from email
         if (!linkedInUrl && inv.email) {
-          const emailHash = inv.email.replace(/[^a-zA-Z0-9]/g, '').toLowerCase().slice(0, 20);
+          const emailHash = createHash('sha256').update(inv.email.toLowerCase()).digest('hex').slice(0, 24);
           linkedInUrl = `https://linkedin.com/in/email-${emailHash}`;
         }
         // Fallback: if still no linkedInUrl, construct from location + firstName + lastName
         if (!linkedInUrl) {
           const parts = [inv.location, inv.firstName, inv.lastName].filter(Boolean);
-          linkedInUrl = `https://linkedin.com/in/unknown-${parts.join('-').replace(/[^a-zA-Z0-9-]/g, '-')}-${i + 1}`;
+          const urlSafe = parts.join('-').replace(/[^a-zA-Z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+          linkedInUrl = urlSafe
+            ? `https://linkedin.com/in/unknown-${urlSafe}-${i + 1}`
+            : `https://linkedin.com/in/unknown-${Date.now()}-${i + 1}`;
         }
 
         insert.run(
