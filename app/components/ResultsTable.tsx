@@ -1,6 +1,6 @@
 'use client';
 
-interface RankResult {
+export interface RankResult {
   rank: number;
   name: string;
   title: string;

@@ -3,17 +3,7 @@ import { useState } from 'react';
 import ImportCSV from './components/ImportCSV';
 import FilterPanel from './components/FilterPanel';
 import QueryBox from './components/QueryBox';
-import ResultsTable from './components/ResultsTable';
-
-interface RankResult {
-  rank: number;
-  name: string;
-  title: string;
-  company: string;
-  linkedInUrl: string;
-  reason: string;
-  score: number;
-}
+import ResultsTable, { RankResult } from './components/ResultsTable';
 
 export default function Home() {
   const [filters, setFilters] = useState({ location: '', seniority: '', industry: '', keyword: '' });
