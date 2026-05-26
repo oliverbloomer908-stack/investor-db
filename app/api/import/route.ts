@@ -19,24 +19,36 @@ export async function POST(req: NextRequest) {
     const headers = Object.keys(rows[0]);
     const { mapping, unmapped, confidence } = detectColumnsWithConfidence(headers);
 
-    // Find truly unmapped headers (not matched to any field at all)
+    // AI fallback: only for headers that were not matched at all by rules
     const trulyUnmapped = headers.filter(h =>
       Object.values(mapping).every(m => m !== h)
     );
 
-    // AI fallback for low-confidence and completely unmapped fields
+    // AI fallback for completely unmapped fields
     if (trulyUnmapped.length > 0 && trulyUnmapped.length <= 10) {
       const aiMappings = await requestColumnMapping({
         unmappedHeaders: trulyUnmapped,
         sampleRows: rows.slice(0, 3),
       });
-      // Merge AI mappings back into mapping
+      // Merge AI mappings back into mapping (only for fields that were truly unmapped)
       for (const [header, field] of Object.entries(aiMappings)) {
         if (field && (mapping as any)[field] === null) {
           (mapping as any)[field] = header;
         }
       }
     }
+
+    // Identify low-confidence matches (matched with < 0.7 confidence)
+    const lowConfidenceFields: string[] = [];
+    for (const field of Object.keys(mapping) as (keyof ColumnMapping)[]) {
+      if (mapping[field] !== null && (confidence[field] || 0) < 0.7) {
+        lowConfidenceFields.push(field);
+      }
+    }
+
+    // Compute post-AI unmapped columns
+    const usedHeaders = new Set(Object.values(mapping).filter(Boolean) as string[]);
+    const postAiUnmapped = headers.filter(h => !usedHeaders.has(h));
 
     const total = rows.length;
 
@@ -95,7 +107,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       imported: inserted,
       total,
-      unmappedColumns: unmapped,
+      unmappedColumns: postAiUnmapped,
+      lowConfidenceFields: lowConfidenceFields.length > 0 ? lowConfidenceFields : undefined,
       columnMapping: mapping,
     });
   } catch (err: any) {
