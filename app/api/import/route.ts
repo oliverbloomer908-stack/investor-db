@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 import { initDb } from '@/lib/db';
-import { parseCSV, detectColumns, mapRowToInvestor } from '@/lib/csv';
+import { parseCSV, detectColumnsWithConfidence, mapRowToInvestor } from '@/lib/csv';
 import { ColumnMapping } from '@/lib/csv';
+import { requestColumnMapping } from '@/lib/aiMapping';
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,7 +17,27 @@ export async function POST(req: NextRequest) {
     if (rows.length === 0) return NextResponse.json({ error: 'No data found in CSV' }, { status: 400 });
 
     const headers = Object.keys(rows[0]);
-    const { mapping, unmapped } = detectColumns(headers);
+    const { mapping, unmapped, confidence } = detectColumnsWithConfidence(headers);
+
+    // Find truly unmapped headers (not matched to any field at all)
+    const trulyUnmapped = headers.filter(h =>
+      Object.values(mapping).every(m => m !== h)
+    );
+
+    // AI fallback for low-confidence and completely unmapped fields
+    if (trulyUnmapped.length > 0 && trulyUnmapped.length <= 10) {
+      const aiMappings = await requestColumnMapping({
+        unmappedHeaders: trulyUnmapped,
+        sampleRows: rows.slice(0, 3),
+      });
+      // Merge AI mappings back into mapping
+      for (const [header, field] of Object.entries(aiMappings)) {
+        if (field && (mapping as any)[field] === null) {
+          (mapping as any)[field] = header;
+        }
+      }
+    }
+
     const total = rows.length;
 
     const db = initDb();

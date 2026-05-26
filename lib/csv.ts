@@ -31,10 +31,24 @@ const FIELD_ALIASES: Record<string, string[]> = {
 };
 
 export function detectColumns(headers: string[]): { mapping: ColumnMapping; unmapped: string[] } {
+  const result = detectColumnsWithConfidence(headers);
+  return { mapping: result.mapping, unmapped: result.unmapped };
+}
+
+export function detectColumnsWithConfidence(headers: string[]): {
+  mapping: ColumnMapping;
+  unmapped: string[];
+  confidence: Record<keyof ColumnMapping, number>;
+} {
   const mapping: ColumnMapping = {
     firstName: null, lastName: null, linkedInUrl: null, description: null,
     location: null, seniority: null, title: null, industries: null,
     companyName: null, companyDescription: null, domain: null, email: null,
+  };
+  const confidence: Record<keyof ColumnMapping, number> = {
+    firstName: 0, lastName: 0, linkedInUrl: 0, description: 0,
+    location: 0, seniority: 0, title: 0, industries: 0,
+    companyName: 0, companyDescription: 0, domain: 0, email: 0,
   };
   const unmapped: string[] = [];
   const usedHeaders = new Set<string>();
@@ -43,8 +57,21 @@ export function detectColumns(headers: string[]): { mapping: ColumnMapping; unma
     const aliases = FIELD_ALIASES[field] || [];
     for (const header of headers) {
       const normalized = header.toLowerCase().trim();
-      if (aliases.some(a => normalized.includes(a)) && !usedHeaders.has(header)) {
+      // Check for exact match (alias exactly equals normalized header)
+      const exactMatch = aliases.some(a => normalized === a.toLowerCase());
+      // Check for substring match (alias is contained in header or vice versa)
+      const substringMatch = aliases.some(a =>
+        normalized.includes(a.toLowerCase()) || a.toLowerCase().includes(normalized)
+      );
+
+      if (exactMatch && !usedHeaders.has(header)) {
         mapping[field] = header;
+        confidence[field] = 1.0;
+        usedHeaders.add(header);
+        break;
+      } else if (substringMatch && !usedHeaders.has(header)) {
+        mapping[field] = header;
+        confidence[field] = 0.7;
         usedHeaders.add(header);
         break;
       }
@@ -55,7 +82,7 @@ export function detectColumns(headers: string[]): { mapping: ColumnMapping; unma
     if (!usedHeaders.has(header)) unmapped.push(header);
   }
 
-  return { mapping, unmapped };
+  return { mapping, unmapped, confidence };
 }
 
 export function parseCSV(content: string): Record<string, string>[] {
