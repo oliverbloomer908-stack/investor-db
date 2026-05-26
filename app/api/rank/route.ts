@@ -32,7 +32,8 @@ export async function POST(req: NextRequest) {
     // Truncate descriptions to keep prompt token count reasonable
     const truncated = candidates.map(c => ({
       ...c,
-      description: (c.description || '').slice(0, 400),
+      linkedInUrl: c.linkedInUrl,
+      description: (c.description || '').slice(0, 300),
     }));
 
     const prompt = buildRankingPrompt(query, truncated, Math.min(limit, candidates.length));
