@@ -33,35 +33,29 @@ export async function chatCompletion(
     }),
   });
 
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`Minimax API error ${response.status}: ${err}`);
-  }
-
+  // Get raw text first
   let text = await response.text();
 
   // Strip <reasoning>...</reasoning> tags if present
   text = text.replace(/<reasoning>[\s\S]*?<\/reasoning>/g, '');
 
-  // Try to extract content — MiniMax can return various formats
-  let content = '';
-
-  // Format 1: full JSON API response
+  // Try to parse as full API JSON response with choices structure
   try {
-    const data = JSON.parse(text) as any;
-    if (data.choices?.[0]?.message?.content) {
-      const raw = data.choices[0].message.content;
-      // If content itself is a JSON string (model parsed it), try parsing it
-      try { content = JSON.parse(raw).choices?.[0]?.message?.content || raw; }
-      catch { content = raw; }
-    } else if (Array.isArray(data)) {
-      // Format 2: model returned bare JSON array as the entire response body
-      content = JSON.stringify(data);
+    const data = JSON.parse(text);
+    if (typeof data === 'object' && data !== null && 'choices' in data) {
+      const raw = data.choices?.[0]?.message?.content;
+      if (typeof raw === 'string') {
+        // Try parsing if content itself is JSON
+        try { return JSON.parse(raw).choices?.[0]?.message?.content || raw; }
+        catch { return raw; }
+      }
     }
   } catch {
-    // Format 3: response is plain text / non-JSON, return as-is
-    content = text.trim();
+    // Not JSON — treat as plain text response (e.g. error messages)
+    return text.trim();
   }
 
-  return content;
+  // If we get here, text wasn't a JSON object with choices
+  // This handles plain text error responses from Minimax
+  return text.trim();
 }
