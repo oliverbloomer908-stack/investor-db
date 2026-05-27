@@ -6,7 +6,10 @@ interface AiMappingInput {
   sampleRows: Record<string, string>[];
 }
 
-export async function requestColumnMapping(input: AiMappingInput): Promise<Record<string, keyof ColumnMapping | null>> {
+export async function requestColumnMapping(
+  input: AiMappingInput,
+  maxRetries = 2
+): Promise<Record<string, keyof ColumnMapping | null>> {
   const { unmappedHeaders, sampleRows } = input;
 
   const samplePreview = sampleRows.slice(0, 3).map(row => {
@@ -25,20 +28,37 @@ ${samplePreview}
 Respond ONLY with valid JSON mapping header → field name (use null if no good mapping exists):
 {"header1": "firstName", "header2": "email", ...}`;
 
-  const response = await chatCompletion([
-    { role: 'user', content: prompt }
-  ], { temperature: 0.1, max_tokens: 1000 });
+  let lastError = '';
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await chatCompletion([
+        { role: 'user', content: prompt }
+      ], { temperature: 0.1, max_tokens: 1000 });
 
-  // response is already the extracted content string from chatCompletion
-  // The model returns JSON like {"header1": "firstName", ...}
-  try {
-    return JSON.parse(response);
-  } catch {
-    // Try extracting from within plain text
-    const match = response.match(/\{[\s\S]*\}/);
-    if (match) {
-      try { return JSON.parse(match[0]); } catch {}
+      // If response starts with "An error" or HTML-like content, treat as failure
+      const trimmed = response.trim();
+      if (trimmed.startsWith('An error') || trimmed.startsWith('<!') || trimmed.startsWith('Error')) {
+        lastError = trimmed;
+        continue;
+      }
+
+      // Try parsing directly
+      try {
+        return JSON.parse(trimmed);
+      } catch {
+        // Try extracting JSON from plain text
+        const match = trimmed.match(/\{[\s\S]*\}/);
+        if (match) {
+          try { return JSON.parse(match[0]); } catch {}
+        }
+      }
+      lastError = 'Could not parse response: ' + trimmed.slice(0, 100);
+    } catch (err: any) {
+      lastError = err.message;
     }
-    return {};
   }
+
+  // All attempts failed — return empty mapping
+  console.warn('AI column mapping failed after retries:', lastError);
+  return {};
 }
