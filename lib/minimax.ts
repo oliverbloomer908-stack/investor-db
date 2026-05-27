@@ -16,7 +16,7 @@ export async function chatCompletion(
   options: MinimaxChatOptions = {}
 ): Promise<string> {
   const apiKey = process.env.MINIMAX_API_KEY;
-  if (!(apiKey)) throw new Error('MINIMAX_API_KEY not set');
+  if (!apiKey) throw new Error('MINIMAX_API_KEY not set');
 
   const response = await fetch(`${MINIMAX_BASE_URL}/v1/chat/completions`, {
     method: 'POST',
@@ -33,19 +33,15 @@ export async function chatCompletion(
   });
 
   const text = await response.text();
+  console.log('[minimax] raw response:', text.slice(0, 500));
 
-  // Strip <reasoning>...</reasoning> and <thinking>...</thinking> tags if present
+  // Strip <reasoning> and <thinking> tags
   const cleaned = text
     .replace(/<reasoning>[\s\S]*?<\/reasoning>/g, '')
     .replace(/<thinking>[\s\S]*?<\/thinking>/g, '');
 
-  // If response is not OK, return the error text so caller can handle it
   if (!response.ok) {
-    return `HTTP_ERROR_${response.status}: ${cleaned.slice(0, 200)}`;
-  }
-
-  // If response is not OK, return the error text so caller can handle it
-  if (!response.ok) {
+    console.log('[minimax] HTTP error:', response.status, cleaned.slice(0, 200));
     return `HTTP_ERROR_${response.status}: ${cleaned.slice(0, 200)}`;
   }
 
@@ -54,7 +50,7 @@ export async function chatCompletion(
   try {
     parsed = JSON.parse(cleaned);
   } catch {
-    // Not JSON — strip any remaining tags and return trimmed text
+    console.log('[minimax] not JSON, returning raw text');
     const trimmed = cleaned.replace(/<[^>]+>/g, '').trim();
     return trimmed;
   }
@@ -62,21 +58,32 @@ export async function chatCompletion(
   if (typeof parsed === 'object' && parsed !== null && 'choices' in parsed) {
     const raw = parsed.choices?.[0]?.message?.content;
     if (typeof raw === 'string') {
-      // Strip reasoning/thinking tags and any surrounding text
+      console.log('[minimax] choices content before tag strip:', raw.slice(0, 300));
       const withoutTags = raw
         .replace(/<reasoning>[\s\S]*?<\/reasoning>/g, '')
         .replace(/<thinking>[\s\S]*?<\/thinking>/g, '')
         .trim();
-      if (!withoutTags) return cleaned.trim();
+      if (!withoutTags) {
+        console.log('[minimax] content empty after tag strip');
+        return cleaned.trim();
+      }
+      console.log('[minimax] content after tag strip:', withoutTags.slice(0, 300));
 
-      // Try to find and extract the first valid JSON object or array in the content
+      // Try to extract and parse a JSON object or array
       const jsonMatch = withoutTags.match(/\{[\s\S]*\}/) || withoutTags.match(/\[[\s\S]*\]/);
       if (jsonMatch) {
-        try { return JSON.stringify(JSON.parse(jsonMatch[0])); } catch { /* fall through */ }
+        try {
+          const inner = JSON.parse(jsonMatch[0]);
+          console.log('[minimax] parsed inner JSON:', JSON.stringify(inner).slice(0, 200));
+          return JSON.stringify(inner);
+        } catch (e: any) {
+          console.log('[minimax] inner JSON parse failed:', e.message);
+        }
       }
       return withoutTags;
     }
   }
 
+  console.log('[minimax] no choices, returning cleaned');
   return cleaned.trim();
 }
