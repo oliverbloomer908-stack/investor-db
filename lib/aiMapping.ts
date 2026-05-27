@@ -35,10 +35,20 @@ Respond ONLY with valid JSON mapping header → field name (use null if no good 
         { role: 'user', content: prompt }
       ], { temperature: 0.1, max_tokens: 1000 });
 
-      // If response starts with "An error" or HTML-like content, treat as failure
       const trimmed = response.trim();
-      if (trimmed.startsWith('An error') || trimmed.startsWith('<!') || trimmed.startsWith('Error')) {
-        lastError = trimmed;
+
+      // If Minimax returned an error indicator, treat as failure
+      if (
+        trimmed.startsWith('HTTP_ERROR_') ||
+        trimmed.startsWith('An error') ||
+        trimmed.startsWith('Error:') ||
+        trimmed.startsWith('<!') ||
+        trimmed.startsWith('<html') ||
+        trimmed.includes('connect ECONNREFUSED') ||
+        trimmed.includes('Unexpected token') ||
+        response.status === 'error'
+      ) {
+        lastError = trimmed.slice(0, 150);
         continue;
       }
 
@@ -52,13 +62,14 @@ Respond ONLY with valid JSON mapping header → field name (use null if no good 
           try { return JSON.parse(match[0]); } catch {}
         }
       }
-      lastError = 'Could not parse response: ' + trimmed.slice(0, 100);
+      // Non-JSON and no error indicator — return empty (no AI mapping possible)
+      lastError = 'Non-JSON response: ' + trimmed.slice(0, 100);
     } catch (err: any) {
       lastError = err.message;
     }
   }
 
-  // All attempts failed — return empty mapping
+  // All attempts failed — return empty mapping, import continues without AI fallback
   console.warn('AI column mapping failed after retries:', lastError);
   return {};
 }

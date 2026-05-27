@@ -4,11 +4,11 @@ import { useState } from 'react';
 export default function ImportCSV() {
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<string[]>([]);
 
   async function handleUpload(files: File[]) {
     setImporting(true);
-    setError(null);
+    setErrors([]);
     let totalImported = 0;
     let totalRows = 0;
     const allUnmapped: string[] = [];
@@ -26,8 +26,8 @@ export default function ImportCSV() {
           allUnmapped.push(...data.unmappedColumns);
         }
       } catch (e: any) {
-        setError(`${file.name}: ${e.message}`);
-        break;
+        // Continue to next file instead of stopping
+        setErrors(prev => [...prev, `${file.name}: ${e.message}`]);
       }
     }
 
@@ -56,7 +56,9 @@ export default function ImportCSV() {
           )}
         </div>
       )}
-      {error && <p className="error">Error: {error}</p>}
+      {errors.map((err, i) => (
+        <p key={i} className="error" style={{ fontSize: '12px' }}>Error: {err}</p>
+      ))}
     </div>
   );
 }

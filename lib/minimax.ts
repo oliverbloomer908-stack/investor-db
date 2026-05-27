@@ -33,29 +33,33 @@ export async function chatCompletion(
     }),
   });
 
-  // Get raw text first
-  let text = await response.text();
+  const text = await response.text();
 
   // Strip <reasoning>...</reasoning> tags if present
-  text = text.replace(/<reasoning>[\s\S]*?<\/reasoning>/g, '');
+  const cleaned = text.replace(/<reasoning>[\s\S]*?<\/reasoning>/g, '');
 
-  // Try to parse as full API JSON response with choices structure
+  // If response is not OK, return the error text so caller can handle it
+  if (!response.ok) {
+    return `HTTP_ERROR_${response.status}: ${cleaned.slice(0, 200)}`;
+  }
+
+  // Try to parse as JSON with choices structure
   try {
-    const data = JSON.parse(text);
+    const data = JSON.parse(cleaned);
     if (typeof data === 'object' && data !== null && 'choices' in data) {
       const raw = data.choices?.[0]?.message?.content;
       if (typeof raw === 'string') {
-        // Try parsing if content itself is JSON
+        // If content itself is JSON string, try to re-parse
         try { return JSON.parse(raw).choices?.[0]?.message?.content || raw; }
         catch { return raw; }
       }
     }
   } catch {
-    // Not JSON — treat as plain text response (e.g. error messages)
-    return text.trim();
+    // Not JSON — return trimmed text as-is
+    const trimmed = cleaned.trim();
+    // Return a sentinel so callers can detect non-JSON responses
+    return trimmed;
   }
 
-  // If we get here, text wasn't a JSON object with choices
-  // This handles plain text error responses from Minimax
-  return text.trim();
+  return cleaned.trim();
 }
