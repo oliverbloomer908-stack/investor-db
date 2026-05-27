@@ -6,20 +6,34 @@ export default function ImportCSV() {
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleUpload(file: File) {
+  async function handleUpload(files: File[]) {
     setImporting(true);
     setError(null);
-    const fd = new FormData();
-    fd.append('file', file);
-    try {
-      const res = await fetch('/api/import', { method: 'POST', body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Import failed');
-      setResult(data);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setImporting(false);
+    let totalImported = 0;
+    let totalRows = 0;
+    const allUnmapped: string[] = [];
+
+    for (const file of files) {
+      const fd = new FormData();
+      fd.append('file', file);
+      try {
+        const res = await fetch('/api/import', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Import failed');
+        totalImported += data.imported;
+        totalRows += data.total;
+        if (data.unmappedColumns?.length > 0) {
+          allUnmapped.push(...data.unmappedColumns);
+        }
+      } catch (e: any) {
+        setError(`${file.name}: ${e.message}`);
+        break;
+      }
+    }
+
+    setImporting(false);
+    if (totalRows > 0) {
+      setResult({ imported: totalImported, total: totalRows, unmappedColumns: allUnmapped });
     }
   }
 
@@ -29,7 +43,8 @@ export default function ImportCSV() {
       <input
         type="file"
         accept=".csv"
-        onChange={e => e.target.files?.[0] && handleUpload(e.target.files[0])}
+        multiple
+        onChange={e => e.target.files?.length && handleUpload(Array.from(e.target.files))}
         disabled={importing}
       />
       {importing && <p>Importing...</p>}
