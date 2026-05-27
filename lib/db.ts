@@ -1,27 +1,60 @@
 import { createClient } from '@libsql/client';
-import Database from 'better-sqlite3';
-import path from 'path';
-import fs from 'fs';
 
-function getDbPath(): string {
-  if (process.env.SQLITE_PATH) return process.env.SQLITE_PATH;
-  // On Vercel serverless, /tmp is the only writable path
-  if (process.env.VERCEL) return '/tmp/investors.db';
-  return path.join(process.cwd(), 'investors.db');
+function getClient() {
+  const url = process.env.TURSO_DATABASE_URL;
+  const token = process.env.TURSO_AUTH_TOKEN;
+  if (!url || !token) throw new Error('TURSO_DATABASE_URL and TURSO_AUTH_TOKEN must be set');
+  return createClient({ url, authToken: token });
 }
 
-let db: Database.Database | null = null;
+function transform(result: { columns: string[]; rows: any[][] }) {
+  return result.rows.map(row =>
+    Object.fromEntries(row.map((val, i) => [result.columns[i], val]))
+  );
+}
 
-function getLocalDb(): Database.Database {
-  if (db) return db;
-  const dbPath = getDbPath();
-  const dir = path.dirname(dbPath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  db = new Database(dbPath);
-  db.pragma('journal_mode = WAL');
-  db.exec(`
+export function getDb() {
+  const client = getClient();
+  return {
+    prepare(sql: string) {
+      return {
+        all(...params: any[]) {
+          const r = client.execute({ sql, args: params });
+          return transform(r);
+        },
+        get(...params: any[]) {
+          const r = client.execute({ sql, args: params });
+          const rows = transform(r);
+          return rows[0] ?? null;
+        },
+        run(...params: any[]) {
+          return client.execute({ sql, args: params });
+        },
+      };
+    },
+    transaction<T>(fn: (rows: T[]) => number) {
+      // Wrap in SQL transaction for actual atomicity
+      return (rows: T[]) => {
+        const sqls = [];
+        client.execute({ sql: 'BEGIN' });
+        try {
+          const count = fn(rows);
+          client.execute({ sql: 'COMMIT' });
+          return count;
+        } catch (err) {
+          client.execute({ sql: 'ROLLBACK' });
+          throw err;
+        }
+      };
+    },
+  };
+}
+
+export function initDb() {
+  const client = getClient();
+  client.execute(`
     CREATE TABLE IF NOT EXISTS investors (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id INTEGER PRIMARY KEY,
       linkedInUrl TEXT NOT NULL,
       firstName TEXT,
       lastName TEXT,
@@ -40,16 +73,8 @@ function getLocalDb(): Database.Database {
       UNIQUE(linkedInUrl)
     )
   `);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_investors_location ON investors(location)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_investors_seniority ON investors(seniority)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_investors_industries ON investors(industries)`);
-  return db;
-}
-
-export function getDb() {
-  return getLocalDb();
-}
-
-export function initDb() {
-  return getLocalDb();
+  client.execute(`CREATE INDEX IF NOT EXISTS idx_investors_location ON investors(location)`);
+  client.execute(`CREATE INDEX IF NOT EXISTS idx_investors_seniority ON investors(seniority)`);
+  client.execute(`CREATE INDEX IF NOT EXISTS idx_investors_industries ON investors(industries)`);
+  return getDb();
 }
