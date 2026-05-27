@@ -8,11 +8,11 @@ export async function GET(req: NextRequest) {
     const offset = parseInt(searchParams.get('offset') || '0');
 
     const db = getDb();
-    const investors = db.prepare(
+    const investors = await db.prepare(
       'SELECT id, linkedInUrl, firstName, lastName, description, location, seniority, title, industries, companyName, companyDescription, domain, email FROM investors LIMIT ? OFFSET ?'
     ).all(limit, offset);
 
-    const countRow = db.prepare('SELECT COUNT(*) as count FROM investors').get() as any;
+    const countRow = (await db.prepare('SELECT COUNT(*) as count FROM investors').get()) as any;
 
     return NextResponse.json({ investors, total: countRow?.count ?? 0 });
   } catch (err: any) {
