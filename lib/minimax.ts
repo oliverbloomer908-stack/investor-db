@@ -35,8 +35,15 @@ export async function chatCompletion(
 
   const text = await response.text();
 
-  // Strip <reasoning>...</reasoning> tags if present
-  const cleaned = text.replace(/<reasoning>[\s\S]*?<\/reasoning>/g, '');
+  // Strip <reasoning>...</reasoning> and <thinking>...</thinking> tags if present
+  const cleaned = text
+    .replace(/<reasoning>[\s\S]*?<\/reasoning>/g, '')
+    .replace(/<thinking>[\s\S]*?<\/thinking>/g, '');
+
+  // If response is not OK, return the error text so caller can handle it
+  if (!response.ok) {
+    return `HTTP_ERROR_${response.status}: ${cleaned.slice(0, 200)}`;
+  }
 
   // If response is not OK, return the error text so caller can handle it
   if (!response.ok) {
@@ -44,21 +51,31 @@ export async function chatCompletion(
   }
 
   // Try to parse as JSON with choices structure
+  let parsed;
   try {
-    const data = JSON.parse(cleaned);
-    if (typeof data === 'object' && data !== null && 'choices' in data) {
-      const raw = data.choices?.[0]?.message?.content;
-      if (typeof raw === 'string') {
-        // If content itself is JSON string, try to re-parse
-        try { return JSON.parse(raw).choices?.[0]?.message?.content || raw; }
-        catch { return raw; }
+    parsed = JSON.parse(cleaned);
+  } catch {
+    // Not JSON — strip any remaining tags and return trimmed text
+    const trimmed = cleaned.replace(/<[^>]+>/g, '').trim();
+    return trimmed;
+  }
+
+  if (typeof parsed === 'object' && parsed !== null && 'choices' in parsed) {
+    const raw = parsed.choices?.[0]?.message?.content;
+    if (typeof raw === 'string') {
+      // Raw content might still be wrapped in tags — strip before parsing
+      const stripped = raw
+        .replace(/<reasoning>[\s\S]*?<\/reasoning>/g, '')
+        .replace(/<thinking>[\s\S]*?<\/thinking>/g, '')
+        .replace(/<[^>]+>/g, '')
+        .trim();
+      try {
+        const inner = JSON.parse(stripped);
+        return typeof inner === 'string' ? inner : inner.choices?.[0]?.message?.content || stripped;
+      } catch {
+        return stripped;
       }
     }
-  } catch {
-    // Not JSON — return trimmed text as-is
-    const trimmed = cleaned.trim();
-    // Return a sentinel so callers can detect non-JSON responses
-    return trimmed;
   }
 
   return cleaned.trim();
