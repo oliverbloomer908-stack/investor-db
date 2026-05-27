@@ -1,87 +1,52 @@
-function transform(result: { columns: string[]; rows: any[][] }) {
-  if (!result.columns || !result.rows) return [];
-  const cols = result.columns;
-  return result.rows.map(row =>
-    Object.fromEntries(row.map((val, i) => [cols[i], val]))
-  );
+import { Pool } from 'pg';
+
+function getPool() {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) throw new Error('DATABASE_URL not set');
+  return new Pool({ connectionString });
 }
 
 export function getDb() {
-  const baseUrl = process.env.TURSO_DATABASE_URL || '';
-  const authToken = process.env.TURSO_AUTH_TOKEN || '';
-
-  async function sqlExecute(sql: string, args: any[] = []) {
-    const url = `${baseUrl}/v1/statements`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${authToken}`,
-        'Content-Type': 'application/json',
-        'X-Custom-Authorization': `Bearer ${authToken}`,
-      },
-      body: JSON.stringify({ sql, args }),
-    });
-    if (!res.ok) throw new Error(`Turso error ${res.status}: ${await res.text()}`);
-    return res.json();
-  }
-
-  const db = {
+  const pool = getPool();
+  return {
     prepare(sql: string) {
       return {
         all(...params: any[]) {
-          return sqlExecute(sql, params).then(r => transform(r));
+          return pool.query(sql, params).then(r => r.rows);
         },
         get(...params: any[]) {
-          return sqlExecute(sql, params).then(r => {
-            const rows = transform(r);
-            return rows[0] ?? null;
-          });
+          return pool.query(sql, params).then(r => r.rows[0] ?? null);
         },
         run(...params: any[]) {
-          return sqlExecute(sql, params);
+          return pool.query(sql, params);
         },
       };
     },
     transaction<T>(fn: (rows: T[]) => number) {
       return async (rows: T[]) => {
-        await sqlExecute('BEGIN', []);
+        const client = await pool.connect();
         try {
+          await client.query('BEGIN');
           const count = fn(rows);
-          await sqlExecute('COMMIT', []);
+          await client.query('COMMIT');
           return count;
         } catch (err) {
-          await sqlExecute('ROLLBACK', []);
+          await client.query('ROLLBACK');
           throw err;
+        } finally {
+          client.release();
         }
       };
     },
   };
-  return db;
 }
 
 export async function initDb() {
-  const baseUrl = process.env.TURSO_DATABASE_URL || '';
-  const authToken = process.env.TURSO_AUTH_TOKEN || '';
-
-  async function sqlExecute(sql: string) {
-    const url = `${baseUrl}/v1/statements`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${authToken}`,
-        'Content-Type': 'application/json',
-        'X-Custom-Authorization': `Bearer ${authToken}`,
-      },
-      body: JSON.stringify({ sql }),
-    });
-    if (!res.ok) throw new Error(`Turso error ${res.status}: ${await res.text()}`);
-    return res.json();
-  }
-
-  await sqlExecute(`
+  const pool = getPool();
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS investors (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      linkedInUrl TEXT NOT NULL,
+      id SERIAL PRIMARY KEY,
+      linkedInUrl TEXT NOT UNIQUE,
       firstName TEXT,
       lastName TEXT,
       description TEXT,
@@ -94,9 +59,11 @@ export async function initDb() {
       domain TEXT,
       email TEXT,
       meta TEXT,
-      createdAt TEXT DEFAULT (datetime('now')),
-      updatedAt TEXT DEFAULT (datetime('now')),
-      UNIQUE(linkedInUrl)
+      createdAt TIMESTAMP DEFAULT NOW(),
+      updatedAt TIMESTAMP DEFAULT NOW()
     )
   `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_investors_location ON investors(location)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_investors_seniority ON investors(seniority)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_investors_industries ON investors(industries)`);
 }

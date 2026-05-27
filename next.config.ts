@@ -1,9 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  experimental: {
-    serverComponentsExternalPackages: ['@libsql/client'],
-  },
+  // pg is a pure JS driver - no special config needed
 };
 
 export default nextConfig;
