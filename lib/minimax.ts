@@ -29,7 +29,6 @@ export async function chatCompletion(
       messages,
       temperature: options.temperature ?? 0.3,
       max_tokens: options.max_tokens ?? 4000,
-      reasoning: { type: 'disable' },
     }),
   });
 
