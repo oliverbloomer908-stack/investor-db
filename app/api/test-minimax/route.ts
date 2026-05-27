@@ -9,7 +9,7 @@ export async function GET() {
       raw: result,
       rawLength: result.length,
       rawFirst50: result.slice(0, 50),
-      rawJsonparsable: (() => { try { JSON.parse(result); return true; } catch (e) { return e.message; } })(),
+      rawJsonparsable: (() => { try { JSON.parse(result); return true; } catch (e: any) { return e ? String(e.message) : String(e); } })(),
     });
   } catch (e: any) {
     return NextResponse.json({ error: e.message });
