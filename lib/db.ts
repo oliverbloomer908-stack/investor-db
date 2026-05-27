@@ -1,48 +1,56 @@
-import { createClient, type ResultSet } from '@libsql/client';
-
-function getClient() {
-  const url = process.env.TURSO_DATABASE_URL;
-  const token = process.env.TURSO_AUTH_TOKEN;
-  if (!url || !token) throw new Error('TURSO_DATABASE_URL and TURSO_AUTH_TOKEN must be set');
-  return createClient({ url, authToken: token });
-}
-
-function transform(result: ResultSet) {
+function transform(result: { columns: string[]; rows: any[][] }) {
   if (!result.columns || !result.rows) return [];
-  const cols = result.columns as string[];
-  return (result.rows as any[]).map((row: any) =>
-    Object.fromEntries((row as any[]).map((val: any, i: number) => [cols[i], val]))
+  const cols = result.columns;
+  return result.rows.map(row =>
+    Object.fromEntries(row.map((val, i) => [cols[i], val]))
   );
 }
 
 export function getDb() {
-  const client = getClient();
+  const baseUrl = process.env.TURSO_DATABASE_URL || '';
+  const authToken = process.env.TURSO_AUTH_TOKEN || '';
+
+  async function sqlExecute(sql: string, args: any[] = []) {
+    const url = `${baseUrl}/v1/statements`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json',
+        'X-Custom-Authorization': `Bearer ${authToken}`,
+      },
+      body: JSON.stringify({ sql, args }),
+    });
+    if (!res.ok) throw new Error(`Turso error ${res.status}: ${await res.text()}`);
+    return res.json();
+  }
+
   const db = {
     prepare(sql: string) {
       return {
         all(...params: any[]) {
-          return client.execute({ sql, args: params }).then(r => transform(r));
+          return sqlExecute(sql, params).then(r => transform(r));
         },
         get(...params: any[]) {
-          return client.execute({ sql, args: params }).then(r => {
+          return sqlExecute(sql, params).then(r => {
             const rows = transform(r);
             return rows[0] ?? null;
           });
         },
         run(...params: any[]) {
-          return client.execute({ sql, args: params });
+          return sqlExecute(sql, params);
         },
       };
     },
     transaction<T>(fn: (rows: T[]) => number) {
       return async (rows: T[]) => {
-        await client.execute({ sql: 'BEGIN' });
+        await sqlExecute('BEGIN', []);
         try {
           const count = fn(rows);
-          await client.execute({ sql: 'COMMIT' });
+          await sqlExecute('COMMIT', []);
           return count;
         } catch (err) {
-          await client.execute({ sql: 'ROLLBACK' });
+          await sqlExecute('ROLLBACK', []);
           throw err;
         }
       };
@@ -52,8 +60,25 @@ export function getDb() {
 }
 
 export async function initDb() {
-  const client = getClient();
-  await client.execute(`
+  const baseUrl = process.env.TURSO_DATABASE_URL || '';
+  const authToken = process.env.TURSO_AUTH_TOKEN || '';
+
+  async function sqlExecute(sql: string) {
+    const url = `${baseUrl}/v1/statements`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json',
+        'X-Custom-Authorization': `Bearer ${authToken}`,
+      },
+      body: JSON.stringify({ sql }),
+    });
+    if (!res.ok) throw new Error(`Turso error ${res.status}: ${await res.text()}`);
+    return res.json();
+  }
+
+  await sqlExecute(`
     CREATE TABLE IF NOT EXISTS investors (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       linkedInUrl TEXT NOT NULL,
@@ -74,7 +99,4 @@ export async function initDb() {
       UNIQUE(linkedInUrl)
     )
   `);
-  await client.execute(`CREATE INDEX IF NOT EXISTS idx_investors_location ON investors(location)`);
-  await client.execute(`CREATE INDEX IF NOT EXISTS idx_investors_seniority ON investors(seniority)`);
-  await client.execute(`CREATE INDEX IF NOT EXISTS idx_investors_industries ON investors(industries)`);
 }
