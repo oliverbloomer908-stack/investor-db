@@ -62,18 +62,19 @@ export async function chatCompletion(
   if (typeof parsed === 'object' && parsed !== null && 'choices' in parsed) {
     const raw = parsed.choices?.[0]?.message?.content;
     if (typeof raw === 'string') {
-      // Raw content might still be wrapped in tags — strip before parsing
-      const stripped = raw
+      // Strip reasoning/thinking tags and any surrounding text
+      const withoutTags = raw
         .replace(/<reasoning>[\s\S]*?<\/reasoning>/g, '')
         .replace(/<thinking>[\s\S]*?<\/thinking>/g, '')
-        .replace(/<[^>]+>/g, '')
         .trim();
-      try {
-        const inner = JSON.parse(stripped);
-        return typeof inner === 'string' ? inner : inner.choices?.[0]?.message?.content || stripped;
-      } catch {
-        return stripped;
+      if (!withoutTags) return cleaned.trim();
+
+      // Try to find and extract the first valid JSON object or array in the content
+      const jsonMatch = withoutTags.match(/\{[\s\S]*\}/) || withoutTags.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        try { return JSON.stringify(JSON.parse(jsonMatch[0])); } catch { /* fall through */ }
       }
+      return withoutTags;
     }
   }
 
