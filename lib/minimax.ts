@@ -39,22 +39,28 @@ export async function chatCompletion(
   }
 
   let text = await response.text();
-  const reasoningMatch = text.match(/<reasoning>([\s\S]*?)<\/reasoning>/);
-  if (reasoningMatch) {
-    text = text.replace(/<reasoning>[\s\S]*?<\/reasoning>/, '');
-  }
 
+  // Strip <reasoning>...</reasoning> tags if present
+  text = text.replace(/<reasoning>[\s\S]*?<\/reasoning>/g, '');
+
+  // Try to extract content — MiniMax can return various formats
   let content = '';
+
+  // Format 1: full JSON API response
   try {
     const data = JSON.parse(text) as any;
-    content = data.choices?.[0]?.message?.content || '';
-  } catch {
-    // Minimax sometimes returns plain text before/around the JSON
-    // Try extracting anything that looks like JSON from the response
-    const jsonMatch = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-    if (jsonMatch) {
-      try { content = JSON.parse(jsonMatch[0])?.choices?.[0]?.message?.content || ''; } catch { content = ''; }
+    if (data.choices?.[0]?.message?.content) {
+      const raw = data.choices[0].message.content;
+      // If content itself is a JSON string (model parsed it), try parsing it
+      try { content = JSON.parse(raw).choices?.[0]?.message?.content || raw; }
+      catch { content = raw; }
+    } else if (Array.isArray(data)) {
+      // Format 2: model returned bare JSON array as the entire response body
+      content = JSON.stringify(data);
     }
+  } catch {
+    // Format 3: response is plain text / non-JSON, return as-is
+    content = text.trim();
   }
 
   return content;

@@ -29,13 +29,16 @@ Respond ONLY with valid JSON mapping header → field name (use null if no good 
     { role: 'user', content: prompt }
   ], { temperature: 0.1, max_tokens: 1000 });
 
+  // response is already the extracted content string from chatCompletion
+  // The model returns JSON like {"header1": "firstName", ...}
   try {
-    // Try bare JSON first
     return JSON.parse(response);
   } catch {
-    // Try extracting from markdown
+    // Try extracting from within plain text
     const match = response.match(/\{[\s\S]*\}/);
-    if (match) return JSON.parse(match[0]);
+    if (match) {
+      try { return JSON.parse(match[0]); } catch {}
+    }
     return {};
   }
 }
