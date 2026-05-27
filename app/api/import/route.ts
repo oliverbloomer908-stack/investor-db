@@ -5,6 +5,17 @@ import { parseCSV, detectColumnsWithConfidence, mapRowToInvestor } from '@/lib/c
 import { ColumnMapping } from '@/lib/csv';
 import { requestColumnMapping } from '@/lib/aiMapping';
 
+async function executeRawSql(sql: string, params: any[] = []) {
+  const { Pool } = await import('pg');
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  try {
+    const result = await pool.query(sql, params);
+    return result.rows;
+  } finally {
+    await pool.end();
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
@@ -19,18 +30,15 @@ export async function POST(req: NextRequest) {
     const headers = Object.keys(rows[0]);
     const { mapping, unmapped, confidence } = detectColumnsWithConfidence(headers);
 
-    // AI fallback: only for headers that were not matched at all by rules
     const trulyUnmapped = headers.filter(h =>
       Object.values(mapping).every(m => m !== h)
     );
 
-    // AI fallback for completely unmapped fields
     if (trulyUnmapped.length > 0 && trulyUnmapped.length <= 10) {
       const aiMappings = await requestColumnMapping({
         unmappedHeaders: trulyUnmapped,
         sampleRows: rows.slice(0, 3),
       });
-      // Merge AI mappings back into mapping (only for fields that were truly unmapped)
       for (const [header, field] of Object.entries(aiMappings)) {
         if (field && (mapping as any)[field] === null) {
           (mapping as any)[field] = header;
@@ -38,7 +46,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Identify low-confidence matches (matched with < 0.7 confidence)
     const lowConfidenceFields: string[] = [];
     for (const field of Object.keys(mapping) as (keyof ColumnMapping)[]) {
       if (mapping[field] !== null && (confidence[field] || 0) < 0.7) {
@@ -46,77 +53,80 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Compute post-AI unmapped columns
     const usedHeaders = new Set(Object.values(mapping).filter(Boolean) as string[]);
     const postAiUnmapped = headers.filter(h => !usedHeaders.has(h));
 
     const total = rows.length;
+    let inserted = 0;
 
-    const db = getDb();
-    const insert = db.prepare(`
-      INSERT INTO investors (linkedInUrl, firstName, lastName, description, location, seniority, title, industries, companyName, companyDescription, domain, email, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-      ON CONFLICT(linkedInUrl) DO UPDATE SET
-        firstName = excluded.firstName,
-        lastName = excluded.lastName,
-        description = excluded.description,
-        location = excluded.location,
-        seniority = excluded.seniority,
-        title = excluded.title,
-        industries = excluded.industries,
-        companyName = excluded.companyName,
-        companyDescription = excluded.companyDescription,
-        domain = excluded.domain,
-        email = excluded.email,
-        updatedAt = datetime('now')
-    `);
+    const DB = await import('pg');
+    const pool = new DB.Pool({ connectionString: process.env.DATABASE_URL! });
 
-    const insertMany = db.transaction((rows: Record<string, string>[]) => {
-      let inserted = 0;
-      for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        const inv = mapRowToInvestor(row, mapping as ColumnMapping);
-        let linkedInUrl = inv.linkedInUrl;
+    try {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
 
-        if (!linkedInUrl && inv.email) {
-          const emailHash = createHash('sha256').update(inv.email.toLowerCase()).digest('hex').slice(0, 24);
-          linkedInUrl = `https://linkedin.com/in/email-${emailHash}`;
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          const inv = mapRowToInvestor(row, mapping as ColumnMapping);
+          let linkedInUrl = inv.linkedInUrl;
+
+          if (!linkedInUrl && inv.email) {
+            const emailHash = createHash('sha256').update(inv.email.toLowerCase()).digest('hex').slice(0, 24);
+            linkedInUrl = `https://linkedin.com/in/email-${emailHash}`;
+          }
+          if (!linkedInUrl) {
+            const parts = [inv.location, inv.firstName, inv.lastName].filter(Boolean);
+            const urlSafe = parts.join('-').replace(/[^a-zA-Z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+            linkedInUrl = urlSafe
+              ? `https://linkedin.com/in/unknown-${urlSafe}-${i + 1}`
+              : `https://linkedin.com/in/unknown-${Date.now()}-${i + 1}`;
+          }
+
+          await client.query(`
+            INSERT INTO investors (linkedInUrl, firstName, lastName, description, location, seniority, title, industries, companyName, companyDescription, domain, email, updatedAt)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
+            ON CONFLICT (linkedInUrl) DO UPDATE SET
+              firstName = excluded.firstName,
+              lastName = excluded.lastName,
+              description = excluded.description,
+              location = excluded.location,
+              seniority = excluded.seniority,
+              title = excluded.title,
+              industries = excluded.industries,
+              companyName = excluded.companyName,
+              companyDescription = excluded.companyDescription,
+              domain = excluded.domain,
+              email = excluded.email,
+              updatedAt = NOW()
+          `, [
+            linkedInUrl,
+            inv.firstName || '',
+            inv.lastName || '',
+            inv.description || '',
+            inv.location || '',
+            inv.seniority || '',
+            inv.title || '',
+            inv.industries || '',
+            inv.companyName || '',
+            inv.companyDescription || '',
+            inv.domain || '',
+            inv.email || null,
+          ]);
+          inserted++;
         }
-        if (!linkedInUrl) {
-          const parts = [inv.location, inv.firstName, inv.lastName].filter(Boolean);
-          const urlSafe = parts.join('-').replace(/[^a-zA-Z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-          linkedInUrl = urlSafe
-            ? `https://linkedin.com/in/unknown-${urlSafe}-${i + 1}`
-            : `https://linkedin.com/in/unknown-${Date.now()}-${i + 1}`;
-        }
 
-        db.prepare(`
-          INSERT INTO investors (linkedInUrl, firstName, lastName, description, location, seniority, title, industries, companyName, companyDescription, domain, email, updatedAt)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-          ON CONFLICT(linkedInUrl) DO UPDATE SET
-            firstName = excluded.firstName,
-            lastName = excluded.lastName,
-            description = excluded.description,
-            location = excluded.location,
-            seniority = excluded.seniority,
-            title = excluded.title,
-            industries = excluded.industries,
-            companyName = excluded.companyName,
-            companyDescription = excluded.companyDescription,
-            domain = excluded.domain,
-            email = excluded.email,
-            updatedAt = datetime('now')
-        `).run(
-          linkedInUrl, inv.firstName || '', inv.lastName || '', inv.description || '',
-          inv.location || '', inv.seniority || '', inv.title || '', inv.industries || '',
-          inv.companyName || '', inv.companyDescription || '', inv.domain || '', inv.email || null
-        );
-        inserted++;
+        await client.query('COMMIT');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      } finally {
+        client.release();
       }
-      return inserted;
-    });
-
-    const inserted = insertMany(rows);
+    } finally {
+      await pool.end();
+    }
 
     return NextResponse.json({
       imported: inserted,
