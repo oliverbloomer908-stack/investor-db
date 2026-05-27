@@ -30,6 +30,22 @@ export default function Home() {
     }
   }
 
+  async function handleExport(query: string) {
+    const res = await fetch('/api/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, filters, limit: 100 }),
+    });
+    if (!res.ok) throw new Error('Export failed');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `investors-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <main className="app">
       <div className="layout">
@@ -39,7 +55,7 @@ export default function Home() {
         </aside>
 
         <section className="main-content">
-          <QueryBox onQuery={handleQuery} loading={loading} />
+          <QueryBox onQuery={handleQuery} onExport={(query: string) => handleExport(query)} loading={loading} />
           {candidateCount !== null && (
             <p className="candidate-count">Ranking from {candidateCount} matching investors</p>
           )}

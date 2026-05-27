@@ -3,10 +3,11 @@ import { useState } from 'react';
 
 interface QueryBoxProps {
   onQuery: (query: string) => Promise<void>;
+  onExport: (query: string) => Promise<void>;
   loading: boolean;
 }
 
-export default function QueryBox({ onQuery, loading }: QueryBoxProps) {
+export default function QueryBox({ onQuery, onExport, loading }: QueryBoxProps) {
   const [query, setQuery] = useState('');
   const [exporting, setExporting] = useState(false);
 
@@ -16,22 +17,10 @@ export default function QueryBox({ onQuery, loading }: QueryBoxProps) {
     await onQuery(query.trim());
   }
 
-  async function handleExport() {
+  async function handleExportClick() {
     setExporting(true);
     try {
-      const res = await fetch('/api/export', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, filters: {}, limit: 100 }),
-      });
-      if (!res.ok) throw new Error('Export failed');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `investors-${Date.now()}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+      await onExport(query.trim());
     } catch (e: any) {
       alert(e.message);
     } finally {
@@ -53,7 +42,7 @@ export default function QueryBox({ onQuery, loading }: QueryBoxProps) {
         <button type="submit" disabled={loading || !query.trim()}>
           {loading ? 'Ranking...' : 'Rank Investors'}
         </button>
-        <button type="button" onClick={handleExport} disabled={exporting || !query.trim()} className="export-btn">
+        <button type="button" onClick={handleExportClick} disabled={exporting || !query.trim() || loading} className="export-btn">
           {exporting ? 'Exporting...' : 'Export CSV'}
         </button>
       </div>
