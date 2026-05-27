@@ -1,4 +1,4 @@
-const MINIMAX_BASE_URL = 'https://api.minimaxi.com/v1';
+const MINIMAX_BASE_URL = 'https://api.minimax.io';
 
 interface MinimaxMessage {
   role: 'system' | 'user' | 'assistant';
@@ -18,17 +18,18 @@ export async function chatCompletion(
   const apiKey = process.env.MINIMAX_API_KEY;
   if (!(apiKey)) throw new Error('MINIMAX_API_KEY not set');
 
-  const response = await fetch(`${MINIMAX_BASE_URL}/chat/completions`, {
+  const response = await fetch(`${MINIMAX_BASE_URL}/v1/chat/completions`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: options.model || 'minimax-01',
+      model: options.model || 'MiniMax-M2.1',
       messages,
       temperature: options.temperature ?? 0.3,
       max_tokens: options.max_tokens ?? 4000,
+      reasoning: { type: 'disable' },
     }),
   });
 
@@ -37,6 +38,24 @@ export async function chatCompletion(
     throw new Error(`Minimax API error ${response.status}: ${err}`);
   }
 
-  const data = await response.json() as any;
-  return data.choices?.[0]?.message?.content || '';
+  let text = await response.text();
+  const reasoningMatch = text.match(/<reasoning>([\s\S]*?)<\/reasoning>/);
+  if (reasoningMatch) {
+    text = text.replace(/<reasoning>[\s\S]*?<\/reasoning>/, '');
+  }
+
+  let content = '';
+  try {
+    const data = JSON.parse(text) as any;
+    content = data.choices?.[0]?.message?.content || '';
+  } catch {
+    // Minimax sometimes returns plain text before/around the JSON
+    // Try extracting anything that looks like JSON from the response
+    const jsonMatch = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+    if (jsonMatch) {
+      try { content = JSON.parse(jsonMatch[0])?.choices?.[0]?.message?.content || ''; } catch { content = ''; }
+    }
+  }
+
+  return content;
 }
