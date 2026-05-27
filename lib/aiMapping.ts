@@ -45,8 +45,7 @@ Respond ONLY with valid JSON mapping header → field name (use null if no good 
         trimmed.startsWith('<!') ||
         trimmed.startsWith('<html') ||
         trimmed.includes('connect ECONNREFUSED') ||
-        trimmed.includes('Unexpected token') ||
-        response.status === 'error'
+        trimmed.includes('Unexpected token')
       ) {
         lastError = trimmed.slice(0, 150);
         continue;
