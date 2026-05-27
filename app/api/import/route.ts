@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'crypto';
-import { initDb } from '@/lib/db';
+import { getDb } from '@/lib/db';
 import { parseCSV, detectColumnsWithConfidence, mapRowToInvestor } from '@/lib/csv';
 import { ColumnMapping } from '@/lib/csv';
 import { requestColumnMapping } from '@/lib/aiMapping';
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
 
     const total = rows.length;
 
-    const db = initDb();
+    const db = getDb();
     const insert = db.prepare(`
       INSERT INTO investors (linkedInUrl, firstName, lastName, description, location, seniority, title, industries, companyName, companyDescription, domain, email, updatedAt)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
@@ -78,12 +78,10 @@ export async function POST(req: NextRequest) {
         const inv = mapRowToInvestor(row, mapping as ColumnMapping);
         let linkedInUrl = inv.linkedInUrl;
 
-        // Fallback: if no linkedInUrl but email exists, generate from email
         if (!linkedInUrl && inv.email) {
           const emailHash = createHash('sha256').update(inv.email.toLowerCase()).digest('hex').slice(0, 24);
           linkedInUrl = `https://linkedin.com/in/email-${emailHash}`;
         }
-        // Fallback: if still no linkedInUrl, construct from location + firstName + lastName
         if (!linkedInUrl) {
           const parts = [inv.location, inv.firstName, inv.lastName].filter(Boolean);
           const urlSafe = parts.join('-').replace(/[^a-zA-Z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
@@ -92,7 +90,23 @@ export async function POST(req: NextRequest) {
             : `https://linkedin.com/in/unknown-${Date.now()}-${i + 1}`;
         }
 
-        insert.run(
+        db.prepare(`
+          INSERT INTO investors (linkedInUrl, firstName, lastName, description, location, seniority, title, industries, companyName, companyDescription, domain, email, updatedAt)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+          ON CONFLICT(linkedInUrl) DO UPDATE SET
+            firstName = excluded.firstName,
+            lastName = excluded.lastName,
+            description = excluded.description,
+            location = excluded.location,
+            seniority = excluded.seniority,
+            title = excluded.title,
+            industries = excluded.industries,
+            companyName = excluded.companyName,
+            companyDescription = excluded.companyDescription,
+            domain = excluded.domain,
+            email = excluded.email,
+            updatedAt = datetime('now')
+        `).run(
           linkedInUrl, inv.firstName || '', inv.lastName || '', inv.description || '',
           inv.location || '', inv.seniority || '', inv.title || '', inv.industries || '',
           inv.companyName || '', inv.companyDescription || '', inv.domain || '', inv.email || null

@@ -66,7 +66,13 @@ export async function GET(req: NextRequest) {
 
     const { sql, params } = buildSearchQuery(filters);
     const db = getDb();
-    const investors = db.prepare(sql).all(...params);
+
+    let investors;
+    if (!sql) {
+      investors = await db.prepare('SELECT id, linkedInUrl, firstName, lastName, description, location, seniority, title, industries, companyName, companyDescription, domain, email FROM investors LIMIT ? OFFSET ?').all(filters.limit, filters.offset);
+    } else {
+      investors = await db.prepare(sql).all(...params);
+    }
 
     return NextResponse.json({ investors, count: investors.length });
   } catch (err: any) {

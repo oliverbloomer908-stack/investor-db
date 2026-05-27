@@ -3,6 +3,28 @@ import { getDb } from '@/lib/db';
 import { buildRankingPrompt } from '@/lib/ranking';
 import { chatCompletion } from '@/lib/minimax';
 
+function extractJsonArray(text: string): any[] | null {
+  // Strategy 1: direct parse
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) return parsed;
+  } catch {}
+
+  // Strategy 2: markdown code fence
+  const mdMatch = text.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/);
+  if (mdMatch) {
+    try { return JSON.parse(mdMatch[1]); } catch {}
+  }
+
+  // Strategy 3: find first [...] and parse it
+  const bareMatch = text.match(/\[[\s\S]*\]/);
+  if (bareMatch) {
+    try { return JSON.parse(bareMatch[0]); } catch {}
+  }
+
+  return null;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { query, filters, limit = 50 } = await req.json() as {
@@ -25,7 +47,7 @@ export async function POST(req: NextRequest) {
     const db = getDb();
     const sql = `SELECT firstName, lastName, description, location, seniority, title, industries, companyName, linkedInUrl
       FROM investors WHERE ${conditions.join(' AND ')} LIMIT 500`;
-    const candidates = db.prepare(sql).all(...params) as any[];
+    const candidates = (await db.prepare(sql).all(...params)) as any[];
 
     if (candidates.length === 0) return NextResponse.json({ results: [], message: 'No matching investors found' });
 
@@ -41,16 +63,13 @@ export async function POST(req: NextRequest) {
       { role: 'user', content: prompt }
     ], { temperature: 0.3, max_tokens: 4000 });
 
-    // Parse JSON response
+    // Parse JSON response — try multiple strategies
     let results: any[];
-    try {
-      results = JSON.parse(responseText);
-      if (!Array.isArray(results)) throw new Error('Not an array');
-    } catch {
-      // Fallback: try to extract JSON from response
-      const match = responseText.match(/\[[\s\S]*\]/);
-      if (match) results = JSON.parse(match[0]);
-      else return NextResponse.json({ error: 'Failed to parse AI response', raw: responseText.slice(0, 500) }, { status: 500 });
+    const parseable = extractJsonArray(responseText);
+    if (parseable) {
+      results = parseable;
+    } else {
+      return NextResponse.json({ error: 'Failed to parse AI response', raw: responseText.slice(0, 1000) }, { status: 500 });
     }
 
     return NextResponse.json({ results, candidateCount: candidates.length });

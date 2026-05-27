@@ -12,9 +12,9 @@ export async function GET(req: NextRequest) {
       'SELECT id, linkedInUrl, firstName, lastName, description, location, seniority, title, industries, companyName, companyDescription, domain, email FROM investors LIMIT ? OFFSET ?'
     ).all(limit, offset);
 
-    const { count } = db.prepare('SELECT COUNT(*) as count FROM investors').get() as { count: number };
+    const countRow = db.prepare('SELECT COUNT(*) as count FROM investors').get() as any;
 
-    return NextResponse.json({ investors, total: count });
+    return NextResponse.json({ investors, total: countRow?.count ?? 0 });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

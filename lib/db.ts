@@ -1,4 +1,4 @@
-import { createClient } from '@libsql/client';
+import { createClient, type ResultSet } from '@libsql/client';
 
 function getClient() {
   const url = process.env.TURSO_DATABASE_URL;
@@ -7,25 +7,27 @@ function getClient() {
   return createClient({ url, authToken: token });
 }
 
-function transform(result: { columns: string[]; rows: any[][] }) {
-  return result.rows.map(row =>
-    Object.fromEntries(row.map((val, i) => [result.columns[i], val]))
+function transform(result: ResultSet) {
+  if (!result.columns || !result.rows) return [];
+  const cols = result.columns as string[];
+  return (result.rows as any[]).map((row: any) =>
+    Object.fromEntries((row as any[]).map((val: any, i: number) => [cols[i], val]))
   );
 }
 
 export function getDb() {
   const client = getClient();
-  return {
+  const db = {
     prepare(sql: string) {
       return {
         all(...params: any[]) {
-          const r = client.execute({ sql, args: params });
-          return transform(r);
+          return client.execute({ sql, args: params }).then(r => transform(r));
         },
         get(...params: any[]) {
-          const r = client.execute({ sql, args: params });
-          const rows = transform(r);
-          return rows[0] ?? null;
+          return client.execute({ sql, args: params }).then(r => {
+            const rows = transform(r);
+            return rows[0] ?? null;
+          });
         },
         run(...params: any[]) {
           return client.execute({ sql, args: params });
@@ -33,28 +35,27 @@ export function getDb() {
       };
     },
     transaction<T>(fn: (rows: T[]) => number) {
-      // Wrap in SQL transaction for actual atomicity
-      return (rows: T[]) => {
-        const sqls = [];
-        client.execute({ sql: 'BEGIN' });
+      return async (rows: T[]) => {
+        await client.execute({ sql: 'BEGIN' });
         try {
           const count = fn(rows);
-          client.execute({ sql: 'COMMIT' });
+          await client.execute({ sql: 'COMMIT' });
           return count;
         } catch (err) {
-          client.execute({ sql: 'ROLLBACK' });
+          await client.execute({ sql: 'ROLLBACK' });
           throw err;
         }
       };
     },
   };
+  return db;
 }
 
-export function initDb() {
+export async function initDb() {
   const client = getClient();
-  client.execute(`
+  await client.execute(`
     CREATE TABLE IF NOT EXISTS investors (
-      id INTEGER PRIMARY KEY,
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       linkedInUrl TEXT NOT NULL,
       firstName TEXT,
       lastName TEXT,
@@ -73,8 +74,7 @@ export function initDb() {
       UNIQUE(linkedInUrl)
     )
   `);
-  client.execute(`CREATE INDEX IF NOT EXISTS idx_investors_location ON investors(location)`);
-  client.execute(`CREATE INDEX IF NOT EXISTS idx_investors_seniority ON investors(seniority)`);
-  client.execute(`CREATE INDEX IF NOT EXISTS idx_investors_industries ON investors(industries)`);
-  return getDb();
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_investors_location ON investors(location)`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_investors_seniority ON investors(seniority)`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_investors_industries ON investors(industries)`);
 }
