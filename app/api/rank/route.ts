@@ -4,24 +4,11 @@ import { buildRankingPrompt } from '@/lib/ranking';
 import { chatCompletion } from '@/lib/minimax';
 
 function extractJsonArray(text: string): any[] | null {
-  // Strategy 1: direct parse
-  try {
-    const parsed = JSON.parse(text);
-    if (Array.isArray(parsed)) return parsed;
-  } catch {}
-
-  // Strategy 2: markdown code fence
-  const mdMatch = text.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/);
-  if (mdMatch) {
-    try { return JSON.parse(mdMatch[1]); } catch {}
-  }
-
-  // Strategy 3: find first [...] and parse it
-  const bareMatch = text.match(/\[[\s\S]*\]/);
-  if (bareMatch) {
-    try { return JSON.parse(bareMatch[0]); } catch {}
-  }
-
+  try { const p = JSON.parse(text); if (Array.isArray(p)) return p; } catch {}
+  const md = text.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/);
+  if (md) { try { return JSON.parse(md[1]); } catch {} }
+  const bare = text.match(/\[[\s\S]*\]/);
+  if (bare) { try { return JSON.parse(bare[0]); } catch {} }
   return null;
 }
 
@@ -35,15 +22,31 @@ export async function POST(req: NextRequest) {
 
     if (!query) return NextResponse.json({ error: 'Query required' }, { status: 400 });
 
-    // Build search to get candidate set
     const conditions: string[] = ['1=1'];
-    const params: string[] = [];
-    if (filters?.location) { conditions.push('(location LIKE ? OR location LIKE ?)'); params.push(`%${filters.location}%`, `%${filters.location.replace(/,.*/, '')}%`); }
-    if (filters?.seniority) { conditions.push('LOWER(seniority) = LOWER(?)'); params.push(filters.seniority); }
-    if (filters?.industry) { conditions.push('industries LIKE ?'); params.push(`%${filters.industry}%`); }
-    if (filters?.keyword) { conditions.push('(description LIKE ? OR companyName LIKE ? OR title LIKE ?)'); params.push(`%${filters.keyword}%`, `%${filters.keyword}%`, `%${filters.keyword}%`); }
+    const params: any[] = [];
+    let p = 1;
 
-    // Get up to 500 candidates for the AI to rank
+    if (filters?.location) {
+      conditions.push(`(location LIKE $${p} OR location LIKE $${p + 1})`);
+      params.push(`%${filters.location}%`, `%${filters.location.replace(/,.*/, '')}%`);
+      p += 2;
+    }
+    if (filters?.seniority) {
+      conditions.push(`LOWER(seniority) = LOWER($${p})`);
+      params.push(filters.seniority);
+      p += 1;
+    }
+    if (filters?.industry) {
+      conditions.push(`industries LIKE $${p}`);
+      params.push(`%${filters.industry}%`);
+      p += 1;
+    }
+    if (filters?.keyword) {
+      conditions.push(`(description LIKE $${p} OR companyName LIKE $${p} OR title LIKE $${p})`);
+      params.push(`%${filters.keyword}%`);
+      p += 1;
+    }
+
     const db = getDb();
     const sql = `SELECT firstName, lastName, description, location, seniority, title, industries, companyName, linkedInUrl
       FROM investors WHERE ${conditions.join(' AND ')} LIMIT 500`;
@@ -51,7 +54,6 @@ export async function POST(req: NextRequest) {
 
     if (candidates.length === 0) return NextResponse.json({ results: [], message: 'No matching investors found' });
 
-    // Truncate descriptions to keep prompt token count reasonable
     const truncated = candidates.map(c => ({
       ...c,
       linkedInUrl: c.linkedInUrl,
@@ -63,7 +65,6 @@ export async function POST(req: NextRequest) {
       { role: 'user', content: prompt }
     ], { temperature: 0.3, max_tokens: 4000 });
 
-    // Parse JSON response — try multiple strategies
     let results: any[];
     const parseable = extractJsonArray(responseText);
     if (parseable) {

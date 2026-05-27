@@ -1,9 +1,10 @@
 import { Pool } from 'pg';
 
+const DATABASE_URL = process.env.DATABASE_URL;
+if (!DATABASE_URL) throw new Error('DATABASE_URL environment variable is not set');
+
 function getPool() {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) throw new Error('DATABASE_URL not set');
-  return new Pool({ connectionString });
+  return new Pool({ connectionString: DATABASE_URL, max: 5 });
 }
 
 export function getDb() {
@@ -20,22 +21,22 @@ export function getDb() {
         run(...params: any[]) {
           return pool.query(sql, params);
         },
-      };
-    },
-    transaction<T>(fn: (rows: T[]) => number) {
-      return async (rows: T[]) => {
-        const client = await pool.connect();
-        try {
-          await client.query('BEGIN');
-          const count = fn(rows);
-          await client.query('COMMIT');
-          return count;
-        } catch (err) {
-          await client.query('ROLLBACK');
-          throw err;
-        } finally {
-          client.release();
-        }
+        transaction<T>(fn: (rows: T[]) => number) {
+          return async (rows: T[]) => {
+            const client = await pool.connect();
+            try {
+              await client.query('BEGIN');
+              const count = fn(rows);
+              await client.query('COMMIT');
+              return count;
+            } catch (err) {
+              await client.query('ROLLBACK');
+              throw err;
+            } finally {
+              client.release();
+            }
+          };
+        },
       };
     },
   };
@@ -66,4 +67,5 @@ export async function initDb() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_investors_location ON investors(location)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_investors_seniority ON investors(seniority)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_investors_industries ON investors(industries)`);
+  await pool.end();
 }
