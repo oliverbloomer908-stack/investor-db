@@ -5,6 +5,8 @@ export default function ImportCSV() {
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [errors, setErrors] = useState<string[]>([]);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteResult, setDeleteResult] = useState<{ deleted: number } | null>(null);
 
   async function handleUpload(files: File[]) {
     setImporting(true);
@@ -37,6 +39,25 @@ export default function ImportCSV() {
     }
   }
 
+  async function handleDeleteAll() {
+    if (!confirm('Delete ALL investors? This cannot be undone.')) return;
+    setDeleting(true);
+    try {
+      const res = await fetch('/api/investors', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Delete failed');
+      setDeleteResult({ deleted: data.deleted });
+    } catch (e: any) {
+      setErrors(prev => [...prev, `Delete failed: ${e.message}`]);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="import-panel">
       <h3>Import CSV</h3>
@@ -59,6 +80,14 @@ export default function ImportCSV() {
       {errors.map((err, i) => (
         <p key={i} className="error" style={{ fontSize: '12px' }}>Error: {err}</p>
       ))}
+      {deleteResult && <p>Deleted {deleteResult.deleted} investors.</p>}
+      <button
+        onClick={handleDeleteAll}
+        disabled={deleting}
+        style={{ marginTop: '8px', padding: '6px', background: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+      >
+        {deleting ? 'Deleting...' : 'Delete All Investors'}
+      </button>
     </div>
   );
 }
