@@ -28,9 +28,10 @@ export async function GET(req: NextRequest) {
     // Top 10 industries — split by comma, deduplicate per investor, then count
     const industriesResult = await db.prepare(`
       SELECT i.industry, COUNT(*) as cnt FROM (
-        SELECT TRIM(unnest(string_to_array(industries, ','))) as industry
+        SELECT id, TRIM(unnest(string_to_array(industries, ','))) as industry
         FROM investors
         WHERE industries IS NOT NULL AND industries != ''
+        GROUP BY id, TRIM(unnest(string_to_array(industries, ',')))
       ) i
       GROUP BY i.industry
       ORDER BY cnt DESC
