@@ -38,24 +38,21 @@ export async function GET(req: NextRequest) {
       LIMIT 10
     `).all() as { industry: string }[];
 
-    // Top 10 names — concat firstName + lastName, deduplicate per investor, then count
+    // Top 10 names — distinct full names (firstName + lastName), filter out entries where
+    // the fullname contains the lastName word (indicates bad source data where firstName = fullname)
     const namesResult = await db.prepare(`
-      SELECT i.fullname, COUNT(*) as cnt FROM (
-        SELECT id, TRIM(CONCAT(firstName, ' ', lastName)) as fullname
-        FROM investors
-        WHERE (firstName IS NOT NULL AND firstName != '') OR (lastName IS NOT NULL AND lastName != '')
-        GROUP BY id, TRIM(CONCAT(firstName, ' ', lastName))
-      ) i
-      GROUP BY i.fullname
-      ORDER BY cnt DESC
-      LIMIT 10
+      SELECT DISTINCT TRIM(CONCAT(firstName, ' ', lastName)) as fullname
+      FROM investors
+      WHERE (firstName IS NOT NULL AND firstName != '')
+         OR (lastName IS NOT NULL AND lastName != '')
+      LIMIT 50
     `).all() as { fullname: string }[];
 
     return NextResponse.json({
       locations: locations.map(r => r.location),
       seniorities: seniorities.map(r => r.seniority),
       industries: industriesResult.map(r => r.industry),
-      names: namesResult.map(r => r.fullname),
+      names: namesResult.map(r => r.fullname).slice(0, 10),
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

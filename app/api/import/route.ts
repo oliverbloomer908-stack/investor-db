@@ -38,6 +38,19 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Apply custom column mappings from frontend (user manually mapped columns)
+    const customMappingsRaw = formData.get('columnMappings');
+    if (customMappingsRaw) {
+      try {
+        const customMappings = JSON.parse(customMappingsRaw as string);
+        for (const [header, field] of Object.entries(customMappings)) {
+          if (header && typeof field === 'string' && headers.includes(header) && field in mapping) {
+            (mapping as any)[field] = header;
+          }
+        }
+      } catch {}
+    }
+
     const usedHeaders = new Set(Object.values(mapping).filter(Boolean) as string[]);
     const postAiUnmapped = headers.filter(h => !usedHeaders.has(h));
 
