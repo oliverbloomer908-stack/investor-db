@@ -26,21 +26,6 @@ export async function POST(req: NextRequest) {
     const params: any[] = [];
     let p = 1;
 
-    if (filters?.location) {
-      conditions.push(`(location LIKE $${p} OR location LIKE $${p + 1})`);
-      params.push(`%${filters.location}%`, `%${filters.location.replace(/,.*/, '')}%`);
-      p += 2;
-    }
-    if (filters?.seniority) {
-      conditions.push(`LOWER(seniority) = LOWER($${p})`);
-      params.push(filters.seniority);
-      p += 1;
-    }
-    if (filters?.industry) {
-      conditions.push(`industries LIKE $${p}`);
-      params.push(`%${filters.industry}%`);
-      p += 1;
-    }
     if (filters?.keyword) {
       conditions.push(`(description LIKE $${p} OR companyName LIKE $${p} OR title LIKE $${p})`);
       params.push(`%${filters.keyword}%`);
@@ -60,7 +45,7 @@ export async function POST(req: NextRequest) {
       description: (c.description || '').slice(0, 300),
     }));
 
-    const prompt = buildRankingPrompt(query, truncated, Math.min(limit, candidates.length));
+    const prompt = buildRankingPrompt(query, truncated, Math.min(limit, candidates.length), filters);
     const responseText = await chatCompletion([
       { role: 'user', content: prompt }
     ], { temperature: 0.3, max_tokens: 4000 });

@@ -1,6 +1,6 @@
 import { Investor } from '@/types';
 
-export function buildRankingPrompt(query: string, candidates: Partial<Investor>[], maxResults: number): string {
+export function buildRankingPrompt(query: string, candidates: Partial<Investor>[], maxResults: number, filters?: { location?: string; seniority?: string; industry?: string }): string {
   const candidateList = candidates.map((c, i) => {
     const name = [c.firstName, c.lastName].filter(Boolean).join(' ') || `Investor ${i + 1}`;
     const desc = (c.description || '').slice(0, 300);
@@ -17,19 +17,14 @@ Query: ${query}
 Candidates:
 ${candidateList}
 
-Respond ONLY with valid JSON array (no markdown, no explanation):
-[
-  {
-    "rank": 1,
-    "name": "Full Name",
-    "title": "Job Title",
-    "company": "Company Name",
-    "linkedInUrl": "https://linkedin.com/in/...",
-    "reason": "why this investor is a good fit (1 sentence)",
-    "score": 9
-  },
-  ...
-]
+${filters ? `Filter signals (use as soft ranking signals, not hard filters):
+${filters.location ? `Location: ${filters.location}` : ''}
+${filters.seniority ? `Seniority: ${filters.seniority}` : ''}
+${filters.industry ? `Industry: ${filters.industry}` : ''}
+` : ''}IMPORTANT: Respond ONLY with a raw JSON array - no markdown formatting, no code blocks, no backticks. Start your response with '[' and end with ']'.
+
+Example of correct format:
+[{"rank":1,"name":"Full Name","title":"Job Title","company":"Company","linkedInUrl":"https://linkedin.com/in/xyz","reason":"brief reason","score":9}]
 
 Scoring: 1-10 based on fit to query. Include score for each. Return top ${maxResults} only.`;
 }
