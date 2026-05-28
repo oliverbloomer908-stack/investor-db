@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
         const values: any[] = [];
         const placeholders: string[] = [];
         let paramIndex = 1;
+        const seenUrls = new Set<string>();
 
         for (const row of batch) {
           const inv = mapRowToInvestor(row, mapping as ColumnMapping);
@@ -70,6 +71,11 @@ export async function POST(req: NextRequest) {
               ? `https://linkedin.com/in/unknown-${urlSafe}-${Date.now()}`
               : `https://linkedin.com/in/unknown-${Date.now()}`;
           }
+
+          // Skip rows with duplicate URLs within the same batch (PostgreSQL ON CONFLICT
+          // cannot update the same row twice in one statement)
+          if (seenUrls.has(linkedInUrl)) continue;
+          seenUrls.add(linkedInUrl);
 
           placeholders.push(`($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6}, $${paramIndex + 7}, $${paramIndex + 8}, $${paramIndex + 9}, $${paramIndex + 10}, $${paramIndex + 11}, NOW())`);
           values.push(
@@ -89,6 +95,7 @@ export async function POST(req: NextRequest) {
           paramIndex += 12;
         }
 
+        if (placeholders.length === 0) return 0;
         await client.query(`
           INSERT INTO investors (linkedInUrl, firstName, lastName, description, location, seniority, title, industries, companyName, companyDescription, domain, email, updatedAt)
           VALUES ${placeholders.join(', ')}
@@ -106,6 +113,7 @@ export async function POST(req: NextRequest) {
             email = EXCLUDED.email,
             updatedAt = NOW()
         `, values);
+        return placeholders.length;
       };
 
       try {
@@ -113,8 +121,8 @@ export async function POST(req: NextRequest) {
 
         for (let i = 0; i < rows.length; i += BATCH_SIZE) {
           const batch = rows.slice(i, i + BATCH_SIZE);
-          await insertRows(batch);
-          inserted += batch.length;
+          const count = await insertRows(batch);
+          inserted += count;
         }
 
         await client.query('COMMIT');
