@@ -50,6 +50,7 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ deleted: rowCount });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('DELETE /api/investors error:', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
