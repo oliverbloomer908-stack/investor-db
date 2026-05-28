@@ -21,7 +21,7 @@ interface SearchableSelectProps {
 
 function SearchableSelect({ value, onChange, options, placeholder, filterKey }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(value);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -32,9 +32,9 @@ function SearchableSelect({ value, onChange, options, placeholder, filterKey }: 
   const handleClickOutside = useCallback((e: MouseEvent) => {
     if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
       setIsOpen(false);
-      setSearch('');
+      setSearch(value);
     }
-  }, []);
+  }, [value]);
 
   useEffect(() => {
     document.addEventListener('mousedown', handleClickOutside);
@@ -43,14 +43,13 @@ function SearchableSelect({ value, onChange, options, placeholder, filterKey }: 
 
   function handleSelect(opt: string) {
     onChange(opt);
+    setSearch(opt);
     setIsOpen(false);
-    setSearch('');
   }
 
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const newValue = e.target.value;
     setSearch(newValue);
-    onChange(newValue);
     setIsOpen(true);
   }
 
@@ -60,13 +59,14 @@ function SearchableSelect({ value, onChange, options, placeholder, filterKey }: 
   }
 
   const dropdownId = `dropdown-${filterKey}`;
+  const displayValue = isOpen ? search : value;
 
   return (
     <div ref={containerRef} style={{ position: 'relative' }}>
       <input
         ref={inputRef}
         type="text"
-        value={value}
+        value={displayValue}
         onChange={handleInputChange}
         onFocus={handleFocus}
         placeholder={placeholder}
