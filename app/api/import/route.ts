@@ -49,8 +49,8 @@ export async function POST(req: NextRequest) {
       const pool = new DB.Pool({ connectionString: process.env.DATABASE_URL! });
       const client = await pool.connect();
 
-      const insertRows = async (batch: typeof rows) => {
-        if (batch.length === 0) return;
+      const insertRows = async (batch: typeof rows): Promise<number> => {
+        if (batch.length === 0) return 0;
         const values: any[] = [];
         const placeholders: string[] = [];
         let paramIndex = 1;
