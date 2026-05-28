@@ -10,9 +10,11 @@ export default function Home() {
   const [results, setResults] = useState<RankResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [candidateCount, setCandidateCount] = useState<number | null>(null);
+  const [selectedUrls, setSelectedUrls] = useState<Set<string>>(new Set());
 
   async function handleQuery(query: string) {
     setLoading(true);
+    setSelectedUrls(new Set());
     try {
       const res = await fetch('/api/rank', {
         method: 'POST',
@@ -28,6 +30,24 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleSelectionChange(urls: Set<string>) {
+    setSelectedUrls(urls);
+  }
+
+  function handleDelete(url: string) {
+    setResults(results.filter(r => r.linkedInUrl !== url));
+    setSelectedUrls(prev => {
+      const next = new Set(prev);
+      next.delete(url);
+      return next;
+    });
+  }
+
+  function handleDeleteSelected() {
+    setResults(results.filter(r => !selectedUrls.has(r.linkedInUrl)));
+    setSelectedUrls(new Set());
   }
 
   async function handleExport(query: string) {
@@ -59,7 +79,14 @@ export default function Home() {
           {candidateCount !== null && (
             <p className="candidate-count">Ranking from {candidateCount} matching investors</p>
           )}
-          <ResultsTable results={results} />
+          <ResultsTable
+            results={results}
+            selectedUrls={selectedUrls}
+            onSelectionChange={handleSelectionChange}
+            onDelete={handleDelete}
+            onDeleteSelected={handleDeleteSelected}
+            selectedCount={selectedUrls.size}
+          />
         </section>
       </div>
     </main>
