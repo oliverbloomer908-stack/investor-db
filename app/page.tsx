@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import ImportCSV from './components/ImportCSV';
-import FilterPanel from './components/FilterPanel';
+import DynamicFilters from './components/DynamicFilters';
 import QueryBox from './components/QueryBox';
 import ResultsTable, { RankResult } from './components/ResultsTable';
 
@@ -37,6 +37,7 @@ export default function Home() {
   }
 
   function handleDelete(url: string) {
+    if (!confirm('Delete this investor? This cannot be undone.')) return;
     setResults(results.filter(r => r.linkedInUrl !== url));
     setSelectedUrls(prev => {
       const next = new Set(prev);
@@ -46,6 +47,7 @@ export default function Home() {
   }
 
   function handleDeleteSelected() {
+    if (!confirm(`Delete ${selectedUrls.size} selected investors? This cannot be undone.`)) return;
     setResults(results.filter(r => !selectedUrls.has(r.linkedInUrl)));
     setSelectedUrls(new Set());
   }
@@ -66,12 +68,30 @@ export default function Home() {
     URL.revokeObjectURL(url);
   }
 
+  async function handleExportSelected() {
+    const urls = Array.from(selectedUrls);
+    if (urls.length === 0) return;
+    const res = await fetch('/api/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ linkedInUrls: urls }),
+    });
+    if (!res.ok) throw new Error('Export failed');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `investors-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <main className="app">
       <div className="layout">
         <aside className="sidebar">
           <ImportCSV />
-          <FilterPanel onSearch={setFilters} />
+          <DynamicFilters onSearch={setFilters} />
         </aside>
 
         <section className="main-content">
@@ -85,6 +105,7 @@ export default function Home() {
             onSelectionChange={handleSelectionChange}
             onDelete={handleDelete}
             onDeleteSelected={handleDeleteSelected}
+            onExportSelected={handleExportSelected}
             selectedCount={selectedUrls.size}
           />
         </section>

@@ -28,6 +28,7 @@ interface ResultsTableProps {
   onSelectionChange: (urls: Set<string>) => void;
   onDelete: (linkedInUrl: string) => void;
   onDeleteSelected?: () => void;
+  onExportSelected?: () => void;
   selectedCount?: number;
 }
 
@@ -65,7 +66,7 @@ function openLinkedIn(url: string) {
   window.open(url, '_blank');
 }
 
-export default function ResultsTable({ results, selectedUrls, onSelectionChange, onDelete, onDeleteSelected, selectedCount }: ResultsTableProps) {
+export default function ResultsTable({ results, selectedUrls, onSelectionChange, onDelete, onDeleteSelected, onExportSelected, selectedCount }: ResultsTableProps) {
   const [expandedUrl, setExpandedUrl] = useState<string | null>(null);
 
   function toggleSelect(url: string) {
@@ -91,6 +92,7 @@ export default function ResultsTable({ results, selectedUrls, onSelectionChange,
         <div style={{ marginBottom: '12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
           <span>{selectedCount} selected</span>
           {onDeleteSelected && <button onClick={onDeleteSelected}>Delete Selected</button>}
+          {onExportSelected && <button onClick={onExportSelected} style={{ marginLeft: '8px' }}>Export Selected</button>}
         </div>
       )}
       <table>
