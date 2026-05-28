@@ -14,11 +14,51 @@ function extractJsonArray(text: string): any[] | null {
 
 export async function POST(req: NextRequest) {
   try {
-    const { query, filters, limit = 100 } = await req.json() as {
+    const { query, filters, limit = 100, linkedInUrls } = await req.json() as {
       query: string;
       filters?: { location?: string; seniority?: string; industry?: string; keyword?: string };
       limit?: number;
+      linkedInUrls?: string[];
     };
+
+    // Direct export: fetch by linkedInUrls, skip ranking
+    if (linkedInUrls && linkedInUrls.length > 0) {
+      const db = getDb();
+      const sql = `SELECT linkedInUrl, firstName, lastName, description, location, seniority, title, industries, companyName, companyDescription, domain, email
+        FROM investors WHERE "linkedInUrl" = ANY($1)`;
+      const investors = (await db.prepare(sql).all(linkedInUrls)) as any[];
+
+      if (investors.length === 0) {
+        return NextResponse.json({ error: 'No investors found for the provided linkedInUrls' }, { status: 404 });
+      }
+
+      const csvRows = [
+        'linkedInUrl,firstName,lastName,title,company,location,industries,description,domain,email'
+      ];
+      for (const inv of investors) {
+        const escape = (v: string) => (v || '').replace(/"/g, '""');
+        csvRows.push(
+          `${inv.linkedInUrl || ''},` +
+          `"${escape(inv.firstName)}",` +
+          `"${escape(inv.lastName)}",` +
+          `"${escape(inv.title)}",` +
+          `"${escape(inv.companyName)}",` +
+          `"${escape(inv.location)}",` +
+          `"${escape(inv.industries)}",` +
+          `"${escape(inv.description)}",` +
+          `"${escape(inv.domain)}",` +
+          `"${escape(inv.email)}"`
+        );
+      }
+
+      const csv = csvRows.join('\n');
+      return new NextResponse(csv, {
+        headers: {
+          'Content-Type': 'text/csv',
+          'Content-Disposition': `attachment; filename="investor-export-${Date.now()}.csv"`,
+        },
+      });
+    }
 
     if (!query) return NextResponse.json({ error: 'Query required' }, { status: 400 });
 
