@@ -20,3 +20,36 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const db = getDb();
+
+    let rowCount = 0;
+
+    if (body.ids && body.ids.length > 0) {
+      const result = await db.prepare(
+        'DELETE FROM investors WHERE id = ANY($1)'
+      ).run(body.ids);
+      rowCount = result.rowCount ?? 0;
+    } else if (body.linkedInUrls && body.linkedInUrls.length > 0) {
+      const result = await db.prepare(
+        'DELETE FROM investors WHERE "linkedInUrl" = ANY($1)'
+      ).run(body.linkedInUrls);
+      rowCount = result.rowCount ?? 0;
+    } else if (Object.keys(body).length === 0) {
+      const result = await db.prepare('DELETE FROM investors').run();
+      rowCount = result.rowCount ?? 0;
+    } else {
+      return NextResponse.json(
+        { error: "Provide ids[], linkedInUrls[], or empty body to delete all" },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json({ deleted: rowCount });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
