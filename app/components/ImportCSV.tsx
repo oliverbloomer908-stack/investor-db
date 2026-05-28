@@ -11,6 +11,7 @@ export default function ImportCSV() {
   async function handleUpload(files: File[]) {
     setImporting(true);
     setErrors([]);
+    setDeleteResult(null);
     let totalImported = 0;
     let totalRows = 0;
     const allUnmapped: string[] = [];
@@ -41,6 +42,8 @@ export default function ImportCSV() {
 
   async function handleDeleteAll() {
     if (!confirm('Delete ALL investors? This cannot be undone.')) return;
+    setErrors([]); // clear previous errors
+    setDeleteResult(null); // clear previous result
     setDeleting(true);
     try {
       const res = await fetch('/api/investors', {
