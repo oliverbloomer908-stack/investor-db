@@ -41,17 +41,21 @@ export async function POST(req: NextRequest) {
     const usedHeaders = new Set(Object.values(mapping).filter(Boolean) as string[]);
     const postAiUnmapped = headers.filter(h => !usedHeaders.has(h));
 
-    const DB = await import('pg');
-    const pool = new DB.Pool({ connectionString: process.env.DATABASE_URL! });
+    const BATCH_SIZE = 100;
     let inserted = 0;
 
     try {
+      const DB = await import('pg');
+      const pool = new DB.Pool({ connectionString: process.env.DATABASE_URL! });
       const client = await pool.connect();
-      try {
-        await client.query('BEGIN');
 
-        for (let i = 0; i < rows.length; i++) {
-          const row = rows[i];
+      const insertRows = async (batch: typeof rows) => {
+        if (batch.length === 0) return;
+        const values: any[] = [];
+        const placeholders: string[] = [];
+        let paramIndex = 1;
+
+        for (const row of batch) {
           const inv = mapRowToInvestor(row, mapping as ColumnMapping);
           let linkedInUrl = inv.linkedInUrl;
 
@@ -63,27 +67,12 @@ export async function POST(req: NextRequest) {
             const parts = [inv.location, inv.firstName, inv.lastName].filter(Boolean);
             const urlSafe = parts.join('-').replace(/[^a-zA-Z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
             linkedInUrl = urlSafe
-              ? `https://linkedin.com/in/unknown-${urlSafe}-${i + 1}`
-              : `https://linkedin.com/in/unknown-${Date.now()}-${i + 1}`;
+              ? `https://linkedin.com/in/unknown-${urlSafe}-${Date.now()}`
+              : `https://linkedin.com/in/unknown-${Date.now()}`;
           }
 
-          await client.query(`
-            INSERT INTO investors (linkedInUrl, firstName, lastName, description, location, seniority, title, industries, companyName, companyDescription, domain, email, updatedAt)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
-            ON CONFLICT (linkedInUrl) DO UPDATE SET
-              firstName = excluded.firstName,
-              lastName = excluded.lastName,
-              description = excluded.description,
-              location = excluded.location,
-              seniority = excluded.seniority,
-              title = excluded.title,
-              industries = excluded.industries,
-              companyName = excluded.companyName,
-              companyDescription = excluded.companyDescription,
-              domain = excluded.domain,
-              email = excluded.email,
-              updatedAt = NOW()
-          `, [
+          placeholders.push(`($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6}, $${paramIndex + 7}, $${paramIndex + 8}, $${paramIndex + 9}, $${paramIndex + 10}, $${paramIndex + 11}, NOW())`);
+          values.push(
             linkedInUrl,
             inv.firstName || '',
             inv.lastName || '',
@@ -96,8 +85,36 @@ export async function POST(req: NextRequest) {
             inv.companyDescription || '',
             inv.domain || '',
             inv.email || null,
-          ]);
-          inserted++;
+          );
+          paramIndex += 12;
+        }
+
+        await client.query(`
+          INSERT INTO investors (linkedInUrl, firstName, lastName, description, location, seniority, title, industries, companyName, companyDescription, domain, email, updatedAt)
+          VALUES ${placeholders.join(', ')}
+          ON CONFLICT (linkedInUrl) DO UPDATE SET
+            firstName = EXCLUDED.firstName,
+            lastName = EXCLUDED.lastName,
+            description = EXCLUDED.description,
+            location = EXCLUDED.location,
+            seniority = EXCLUDED.seniority,
+            title = EXCLUDED.title,
+            industries = EXCLUDED.industries,
+            companyName = EXCLUDED.companyName,
+            companyDescription = EXCLUDED.companyDescription,
+            domain = EXCLUDED.domain,
+            email = EXCLUDED.email,
+            updatedAt = NOW()
+        `, values);
+      };
+
+      try {
+        await client.query('BEGIN');
+
+        for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+          const batch = rows.slice(i, i + BATCH_SIZE);
+          await insertRows(batch);
+          inserted += batch.length;
         }
 
         await client.query('COMMIT');
@@ -106,9 +123,10 @@ export async function POST(req: NextRequest) {
         throw err;
       } finally {
         client.release();
+        await pool.end();
       }
-    } finally {
-      await pool.end();
+    } catch (err: any) {
+      return NextResponse.json({ error: err.message, debug }, { status: 500 });
     }
 
     return NextResponse.json({
