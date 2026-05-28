@@ -26,13 +26,9 @@ export async function POST(req: NextRequest) {
     const params: any[] = [];
     let p = 1;
 
-    // Name is a hard database filter (search firstName OR lastName OR full name)
+    // Name is a hard database filter — search the full concatenated name
     if (filters?.name) {
-      conditions.push(`(
-        LOWER(CONCAT(firstName, ' ', lastName)) LIKE $${p}
-        OR LOWER(firstName) LIKE $${p}
-        OR LOWER(lastName) LIKE $${p}
-      )`);
+      conditions.push(`LOWER(CONCAT(firstName, ' ', lastName)) LIKE $${p}`);
       params.push(`%${filters.name.toLowerCase()}%`);
       p += 1;
     }
@@ -68,7 +64,30 @@ export async function POST(req: NextRequest) {
     let results: any[];
     const parseable = extractJsonArray(responseText);
     if (parseable) {
-      results = parseable;
+      // Merge AI results with original DB candidate data so DetailPanel has all fields
+      const candidateByUrl = new Map(candidates.map(c => [c.linkedInUrl, c]));
+      results = parseable.map((r: any) => {
+        const db = candidateByUrl.get(r.linkedInUrl);
+        return {
+          ...r,
+          // Always use DB fields for accurate data (AI only echoes what it received)
+          firstName: db?.firstName || '',
+          lastName: db?.lastName || '',
+          name: db
+            ? [db.firstName, db.lastName].filter(Boolean).join(' ') || r.name
+            : r.name,
+          description: db?.description || r.description || '',
+          location: db?.location || '',
+          seniority: db?.seniority || '',
+          industries: db?.industries || '',
+          companyName: db?.companyName || r.company || '',
+          company: db?.companyName || r.company || '',
+          companyDescription: db?.companyDescription || '',
+          domain: db?.domain || '',
+          email: db?.email || '',
+          linkedInUrl: r.linkedInUrl,
+        };
+      });
     } else {
       return NextResponse.json({ error: 'Failed to parse AI response', raw: responseText.slice(0, 1000) }, { status: 500 });
     }
