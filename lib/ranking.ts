@@ -1,6 +1,6 @@
 import { Investor } from '@/types';
 
-export function buildRankingPrompt(query: string, candidates: Partial<Investor>[], maxResults: number, filters?: { location?: string; seniority?: string; industry?: string }): string {
+export function buildRankingPrompt(query: string, candidates: Partial<Investor>[], maxResults: number, filters?: { location?: string; seniority?: string; industry?: string; name?: string }): string {
   const candidateList = candidates.map((c, i) => {
     const name = [c.firstName, c.lastName].filter(Boolean).join(' ') || `Investor ${i + 1}`;
     const desc = (c.description || '').slice(0, 300);
@@ -21,6 +21,7 @@ ${filters ? `Filter signals (use as soft ranking signals, not hard filters):
 ${filters.location ? `Location: ${filters.location}` : ''}
 ${filters.seniority ? `Seniority: ${filters.seniority}` : ''}
 ${filters.industry ? `Industry: ${filters.industry}` : ''}
+${filters.name ? `Investor name: ${filters.name}` : ''}
 ` : ''}IMPORTANT: Respond ONLY with a raw JSON array - no markdown formatting, no code blocks, no backticks. Start your response with '[' and end with ']'.
 
 Example of correct format:

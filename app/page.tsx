@@ -6,7 +6,7 @@ import QueryBox from './components/QueryBox';
 import ResultsTable, { RankResult } from './components/ResultsTable';
 
 export default function Home() {
-  const [filters, setFilters] = useState({ location: '', seniority: '', industry: '', keyword: '' });
+  const [filters, setFilters] = useState({ location: '', seniority: '', industry: '', name: '', keyword: '' });
   const [results, setResults] = useState<RankResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [candidateCount, setCandidateCount] = useState<number | null>(null);

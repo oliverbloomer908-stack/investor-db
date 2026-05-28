@@ -2,13 +2,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 interface DynamicFiltersProps {
-  onSearch: (filters: { location: string; seniority: string; industry: string; keyword: string }) => void;
+  onSearch: (filters: { location: string; seniority: string; industry: string; name: string; keyword: string }) => void;
 }
 
 interface FilterOptions {
   locations: string[];
   seniorities: string[];
   industries: string[];
+  names: string[];
 }
 
 interface SearchableSelectProps {
@@ -127,8 +128,8 @@ function SearchableSelect({ value, onChange, options, placeholder, filterKey }: 
 }
 
 export default function DynamicFilters({ onSearch }: DynamicFiltersProps) {
-  const [filters, setFilters] = useState({ location: '', seniority: '', industry: '', keyword: '' });
-  const [options, setOptions] = useState<FilterOptions>({ locations: [], seniorities: [], industries: [] });
+  const [filters, setFilters] = useState({ location: '', seniority: '', industry: '', name: '', keyword: '' });
+  const [options, setOptions] = useState<FilterOptions>({ locations: [], seniorities: [], industries: [], names: [] });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -141,6 +142,7 @@ export default function DynamicFilters({ onSearch }: DynamicFiltersProps) {
             locations: data.locations || [],
             seniorities: data.seniorities || [],
             industries: data.industries || [],
+            names: data.names || [],
           });
         }
       } finally {
@@ -204,6 +206,17 @@ export default function DynamicFilters({ onSearch }: DynamicFiltersProps) {
               options={options.industries}
               placeholder="Select industry"
               filterKey="industry"
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>Name</label>
+            <SearchableSelect
+              value={filters.name}
+              onChange={v => updateFilter('name', v)}
+              options={options.names}
+              placeholder="Select investor name"
+              filterKey="name"
             />
           </div>
 

@@ -16,7 +16,7 @@ export interface ColumnMapping {
 }
 
 const FIELD_ALIASES: Record<string, string[]> = {
-  firstName: ['first name', 'firstname', 'person first name', 'first', 'fname', 'given name', 'given_name', 'person first'],
+  firstName: ['first name', 'firstname', 'person first name', 'first', 'fname', 'given name', 'given_name', 'person first', 'name', 'full name', 'fullname'],
   lastName: ['last name', 'lastname', 'person last name', 'last', 'lname', 'surname', 'family name', 'family_name', 'client last name', 'person last'],
   linkedInUrl: ['linkedin', 'linkedin url', 'linkedin profile', 'linkedin link', 'profile', 'person linkedin', 'person linkedin url', 'linkedinid', 'li_url', 'linkedin_profile', 'person linkedin profile'],
   description: ['description', 'person description', 'bio', 'about', 'summary', 'person bio', 'bio_short'],

@@ -49,3 +49,132 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .score-badge { background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
 .results-table button { padding: 4px 12px; background: #1a1a2e; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; }
 .results-table button:hover { background: #16213e; }
+
+/* Database page */
+.detail-panel {
+  position: fixed;
+  right: 0;
+  top: 0;
+  height: 100vh;
+  width: 360px;
+  background: #fff;
+  box-shadow: -2px 0 12px rgba(0,0,0,0.15);
+  z-index: 50;
+  overflow-y: auto;
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+}
+.detail-panel.open {
+  transform: translateX(0);
+}
+.detail-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.25);
+  z-index: 40;
+  display: none;
+}
+.detail-backdrop.open {
+  display: block;
+}
+.detail-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #666;
+}
+.detail-panel-inner {
+  padding: 24px;
+}
+.detail-field {
+  margin-bottom: 16px;
+}
+.detail-field label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: block;
+  margin-bottom: 4px;
+}
+.detail-field span {
+  font-size: 13px;
+  color: #222;
+}
+.db-search {
+  margin-bottom: 16px;
+}
+.db-search input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.db-table {
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.db-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.db-table th {
+  background: #f5f5f5;
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+}
+.db-table td {
+  padding: 12px;
+  border-top: 1px solid #eee;
+  font-size: 13px;
+}
+.db-table tr:hover td {
+  background: #fafafa;
+}
+.db-table td button {
+  padding: 4px 12px;
+  background: #1a1a2e;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.db-table td button:hover {
+  background: #16213e;
+}
+.db-pagination {
+  margin-top: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.db-pagination button {
+  padding: 6px 16px;
+  background: #1a1a2e;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.db-pagination button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.db-empty {
+  text-align: center;
+  padding: 48px;
+  color: #888;
+}
