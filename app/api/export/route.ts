@@ -24,8 +24,8 @@ export async function POST(req: NextRequest) {
     // Direct export: fetch by linkedInUrls, skip ranking
     if (linkedInUrls && linkedInUrls.length > 0) {
       const db = getDb();
-      const sql = `SELECT linkedInUrl, firstName, lastName, description, location, seniority, title, industries, companyName, companyDescription, domain, email
-        FROM investors WHERE "linkedInUrl" = ANY($1)`;
+      const sql = `SELECT linkedinurl, firstname, lastname, description, location, seniority, title, industries, companyname, companydescription, domain, email
+        FROM investors WHERE linkedinurl = ANY($1)`;
       const investors = (await db.prepare(sql).all(linkedInUrls)) as any[];
 
       if (investors.length === 0) {
@@ -38,11 +38,11 @@ export async function POST(req: NextRequest) {
       for (const inv of investors) {
         const escape = (v: string) => (v || '').replace(/"/g, '""');
         csvRows.push(
-          `${inv.linkedInUrl || ''},` +
-          `"${escape(inv.firstName)}",` +
-          `"${escape(inv.lastName)}",` +
+          `${inv.linkedinurl || ''},` +
+          `"${escape(inv.firstname)}",` +
+          `"${escape(inv.lastname)}",` +
           `"${escape(inv.title)}",` +
-          `"${escape(inv.companyName)}",` +
+          `"${escape(inv.companyname)}",` +
           `"${escape(inv.location)}",` +
           `"${escape(inv.industries)}",` +
           `"${escape(inv.description)}",` +

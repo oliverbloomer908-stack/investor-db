@@ -35,7 +35,7 @@ export async function DELETE(req: NextRequest) {
       rowCount = result.rowCount ?? 0;
     } else if (body.linkedInUrls && body.linkedInUrls.length > 0) {
       const result = await db.prepare(
-        'DELETE FROM investors WHERE "linkedInUrl" = ANY($1)'
+        'DELETE FROM investors WHERE linkedinurl = ANY($1)'
       ).run(body.linkedInUrls);
       rowCount = result.rowCount ?? 0;
     } else if (Object.keys(body).length === 0) {
