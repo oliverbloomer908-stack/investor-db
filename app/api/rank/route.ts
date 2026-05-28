@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
   try {
     const { query, filters, limit = 50 } = await req.json() as {
       query: string;
-      filters?: { location?: string; seniority?: string; industry?: string; keyword?: string };
+      filters?: { location?: string; seniority?: string; industry?: string; name?: string; keyword?: string };
       limit?: number;
     };
 
@@ -26,6 +26,17 @@ export async function POST(req: NextRequest) {
     const params: any[] = [];
     let p = 1;
 
+    // Name is a hard database filter (search firstName OR lastName OR full name)
+    if (filters?.name) {
+      conditions.push(`(
+        LOWER(CONCAT(firstName, ' ', lastName)) LIKE $${p}
+        OR LOWER(firstName) LIKE $${p}
+        OR LOWER(lastName) LIKE $${p}
+      )`);
+      params.push(`%${filters.name.toLowerCase()}%`);
+      p += 1;
+    }
+
     if (filters?.keyword) {
       conditions.push(`(description LIKE $${p} OR companyName LIKE $${p} OR title LIKE $${p})`);
       params.push(`%${filters.keyword}%`);
@@ -33,7 +44,7 @@ export async function POST(req: NextRequest) {
     }
 
     const db = getDb();
-    const sql = `SELECT firstName, lastName, description, location, seniority, title, industries, companyName, linkedInUrl
+    const sql = `SELECT firstName, lastName, description, location, seniority, title, industries, companyName, linkedInUrl, email, domain, companyDescription
       FROM investors WHERE ${conditions.join(' AND ')} LIMIT 500`;
     const candidates = (await db.prepare(sql).all(...params)) as any[];
 
@@ -45,7 +56,11 @@ export async function POST(req: NextRequest) {
       description: (c.description || '').slice(0, 300),
     }));
 
-    const prompt = buildRankingPrompt(query, truncated, Math.min(limit, candidates.length), filters);
+    const prompt = buildRankingPrompt(query, truncated, Math.min(limit, candidates.length), {
+      location: filters?.location,
+      seniority: filters?.seniority,
+      industry: filters?.industry,
+    });
     const responseText = await chatCompletion([
       { role: 'user', content: prompt }
     ], { temperature: 0.3, max_tokens: 4000 });
