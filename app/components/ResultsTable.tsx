@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 
 export interface RankResult {
   rank: number;
@@ -114,8 +114,8 @@ export default function ResultsTable({ results, selectedUrls, onSelectionChange,
         </thead>
         <tbody>
           {results.map(r => (
-            <>
-              <tr key={r.rank}>
+            <React.Fragment key={r.linkedInUrl}>
+              <tr>
                 <td>
                   <input
                     type="checkbox"
@@ -143,7 +143,7 @@ export default function ResultsTable({ results, selectedUrls, onSelectionChange,
                   onClose={() => setExpandedUrl(null)}
                 />
               )}
-            </>
+            </React.Fragment>
           ))}
         </tbody>
       </table>
