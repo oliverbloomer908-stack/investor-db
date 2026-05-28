@@ -71,19 +71,23 @@ export default function Home() {
   async function handleExportSelected() {
     const urls = Array.from(selectedUrls);
     if (urls.length === 0) return;
-    const res = await fetch('/api/export', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ linkedInUrls: urls }),
-    });
-    if (!res.ok) throw new Error('Export failed');
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `investors-${Date.now()}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      const res = await fetch('/api/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ linkedInUrls: urls }),
+      });
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `investors-${Date.now()}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      alert(e.message || 'Export failed');
+    }
   }
 
   return (
