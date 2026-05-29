@@ -4,7 +4,9 @@ import { buildRankingPrompt } from '@/lib/ranking';
 import { chatCompletion } from '@/lib/minimax';
 
 function extractJsonArray(text: string): any[] | null {
-  try { const p = JSON.parse(text); if (Array.isArray(p)) return p; } catch {}
+  // Strip AI reasoning/thinking tags before parsing
+  const cleaned = text.replace(/<[^>]*>/g, '');
+  try { const p = JSON.parse(cleaned); if (Array.isArray(p)) return p; } catch {}
   const md = text.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/);
   if (md) { try { return JSON.parse(md[1]); } catch {} }
   const bare = text.match(/\[[\s\S]*\]/);
@@ -113,7 +115,6 @@ export async function POST(req: NextRequest) {
           companyDescription: db?.companyDescription || '',
           domain: db?.domain || '',
           email: db?.email || '',
-          linkedInUrl: r.linkedInUrl,
         };
       });
     } else {

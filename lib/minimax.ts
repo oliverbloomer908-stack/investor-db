@@ -62,6 +62,8 @@ export async function chatCompletion(
       const withoutTags = raw
         .replace(/<reasoning>[\s\S]*?<\/reasoning>/g, '')
         .replace(/<thinking>[\s\S]*?<\/thinking>/g, '')
+        .replace(/<vercel_thinking>[\s\S]*?<\/vercel_thinking>/g, '')
+        .replace(/<[^>]+>/g, '')
         .trim();
       if (!withoutTags) {
         console.log('[minimax] content empty after tag strip');
