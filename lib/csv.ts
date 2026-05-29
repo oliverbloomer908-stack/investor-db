@@ -16,8 +16,8 @@ export interface ColumnMapping {
 }
 
 const FIELD_ALIASES: Record<string, string[]> = {
-  firstName: ['first name', 'firstname', 'person first name', 'person first', 'first', 'fname', 'given name', 'given_name', 'name', 'full name', 'fullname'],
-  lastName: ['last name', 'lastname', 'person last name', 'last', 'lname', 'surname', 'family name', 'family_name', 'client last name', 'person last'],
+  firstName: ['first name', 'firstname', 'person first name', 'first', 'fname', 'given name', 'given_name', 'full name', 'fullname'],
+  lastName: ['last name', 'lastname', 'person last name', 'person name', 'last', 'lname', 'surname', 'family name', 'family_name', 'client last name'],
   linkedInUrl: ['linkedin', 'linkedin url', 'linkedin profile', 'linkedin link', 'profile', 'person linkedin', 'person linkedin url', 'linkedinid', 'li_url', 'linkedin_profile', 'person linkedin profile'],
   description: ['description', 'person description', 'bio', 'about', 'summary', 'person bio', 'bio_short'],
   location: ['location', 'person location', 'city', 'address', 'region', 'person location'],
@@ -57,11 +57,12 @@ export function detectColumnsWithConfidence(headers: string[]): {
     const aliases = FIELD_ALIASES[field] || [];
     for (const header of headers) {
       const normalized = header.toLowerCase().trim();
-      // Check for exact match (alias exactly equals normalized header)
+      // Exact match — highest confidence, wins over substring
       const exactMatch = aliases.some(a => normalized === a.toLowerCase());
-      // Check for substring match (alias is contained in header or vice versa)
+      // Substring match only when header is meaningfully longer than alias
+      // (alias must be at least 5 chars shorter — prevents "person name" from matching "person last name")
       const substringMatch = aliases.some(a =>
-        normalized.includes(a.toLowerCase()) || a.toLowerCase().includes(normalized)
+        normalized.includes(a.toLowerCase()) && normalized.length - a.toLowerCase().length >= 5
       );
 
       if (exactMatch && !usedHeaders.has(header)) {
