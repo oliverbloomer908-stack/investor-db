@@ -109,26 +109,19 @@ export async function POST(req: NextRequest) {
     let ranked: any[];
     const parseable = extractJsonArray(responseText);
     if (parseable) {
-      // Merge with DB data using candidate index for reliable lookup
+      // Build a map of fullName -> candidate for reliable lookup
+      const byName = new Map(
+        candidates.map((c: any) => {
+          const full = [c.firstName, c.lastName].filter(Boolean).join(' ');
+          return [full.toLowerCase(), c];
+        })
+      );
       ranked = parseable.map((r: any) => {
-        let db: any = null;
-        if (r.candidate != null) {
-          const idx = Number(r.candidate) - 1;
-          if (idx >= 0 && idx < candidates.length) db = candidates[idx];
-        }
-        if (!db && r.linkedInUrl) {
-          db = candidates.find((c: any) => c.linkedInUrl === r.linkedInUrl) || null;
-        }
-        if (!db && r.name) {
-          const idxMatch = String(r.name).match(/^Investor\s+(\d+)$/);
-          if (idxMatch) {
-            const idx = parseInt(idxMatch[1], 10) - 1;
-            if (idx >= 0 && idx < candidates.length) db = candidates[idx];
-          }
-        }
+        const fullName = r.fullName || '';
+        const db = byName.get(fullName.toLowerCase()) || null;
         return {
           ...r,
-          name: db ? [db.firstName, db.lastName].filter(Boolean).join(' ') || r.name : (r.name || ''),
+          name: db ? [db.firstName, db.lastName].filter(Boolean).join(' ') || fullName : fullName,
           title: db?.title || r.title || '',
           company: db?.companyName || r.company || '',
           location: db?.location || r.location || '',

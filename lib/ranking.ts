@@ -8,14 +8,16 @@ export function buildRankingPrompt(query: string, candidates: Partial<Investor>[
     return `[${i + 1}] ${name} | ${co} | ${bio}`;
   }).join('\n\n');
 
-  return `Given the query and candidate list, return ONLY a JSON array with the top ${maxResults} most relevant candidate indices.
+  return `Given the query and candidate list below, rank the top ${maxResults} most relevant investors by returning their FULL NAME from the list.
 
 Query: ${query}
 
-Candidates (index starts at 1):
+Candidates:
 ${candidateList}
 
-Return ONLY a JSON array with exactly these fields: rank (1,2,3...), candidate (the index number from the list), score (1-10), and reason (1 sentence why this candidate fits). Do NOT include any other fields. Do NOT invent data — use only the candidates above.
+Return a JSON array with {rank, fullName, score, reason}. The fullName MUST exactly match one of the names in the list above. Score is 1-10. reason is 1 sentence.
 
-Example: [{"rank":1,"candidate":5,"score":9,"reason":"London-based fintech angel investor"}]`;
+IMPORTANT: fullName must be an EXACT match from the list above. Do not abbreviate, translate, or modify names.
+
+Example: [{"rank":1,"fullName":"John Smith","score":9,"reason":"London-based fintech VC"}]`;
 }

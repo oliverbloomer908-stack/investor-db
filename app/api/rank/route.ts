@@ -80,38 +80,28 @@ export async function POST(req: NextRequest) {
     let results: any[];
     const parseable = extractJsonArray(responseText);
     if (parseable) {
-      // Merge AI results with original DB candidate data — use candidate index for reliable lookup
+      // Build a map of fullName -> candidate for reliable lookup
+      const byName = new Map(
+        candidates.map((c: any) => {
+          const full = [c.firstName, c.lastName].filter(Boolean).join(' ');
+          return [full.toLowerCase(), c];
+        })
+      );
       results = parseable.map((r: any) => {
-        // Try candidate number (1-based) first, then URL, then name-based index
-        let db: any = null;
-        if (r.candidate != null) {
-          const idx = Number(r.candidate) - 1;
-          if (idx >= 0 && idx < candidates.length) db = candidates[idx];
-        }
-        if (!db && r.linkedInUrl) {
-          db = candidates.find((c: any) => c.linkedInUrl === r.linkedInUrl) || null;
-        }
-        if (!db && r.name) {
-          const idxMatch = String(r.name).match(/^Investor\s+(\d+)$/);
-          if (idxMatch) {
-            const idx = parseInt(idxMatch[1], 10) - 1;
-            if (idx >= 0 && idx < candidates.length) db = candidates[idx];
-          }
-        }
+        const fullName = r.fullName || '';
+        const db = byName.get(fullName.toLowerCase()) || null;
         return {
           ...r,
           firstName: db?.firstName || '',
           lastName: db?.lastName || '',
-          name: db
-            ? [db.firstName, db.lastName].filter(Boolean).join(' ') || r.name
-            : r.name,
-          linkedInUrl: db?.linkedInUrl || r.linkedInUrl || '',
-          description: db?.description || r.description || '',
+          name: db ? [db.firstName, db.lastName].filter(Boolean).join(' ') || fullName : fullName,
+          linkedInUrl: db?.linkedInUrl || '',
+          description: db?.description || '',
           location: db?.location || '',
           seniority: db?.seniority || '',
           industries: db?.industries || '',
-          companyName: db?.companyName || r.company || '',
-          company: db?.companyName || r.company || '',
+          companyName: db?.companyName || '',
+          company: db?.companyName || '',
           companyDescription: db?.companyDescription || '',
           domain: db?.domain || '',
           email: db?.email || '',
