@@ -110,19 +110,22 @@ export async function POST(req: NextRequest) {
     let ranked: any[];
     const parseable = extractJsonArray(responseText);
     if (parseable) {
-      // Build a map of fullName -> candidate for reliable lookup
-      const byName = new Map(
-        candidates.map((c: any) => {
-          const full = [c.firstName, c.lastName].filter(Boolean).join(' ');
-          return [full.toLowerCase(), c];
-        })
-      );
       ranked = parseable.map((r: any) => {
-        const fullName = r.fullName || '';
-        const db = byName.get(fullName.toLowerCase()) || null;
+        let db: any = null;
+        if (r.index != null) {
+          const idx = Number(r.index);
+          if (idx >= 0 && idx < candidates.length) db = candidates[idx];
+        }
+        if (!db && r.fullName) {
+          const fn = (r.fullName || '').toLowerCase();
+          db = candidates.find((c: any) =>
+            [c.firstName, c.lastName].filter(Boolean).join(' ').toLowerCase() === fn
+          ) || null;
+        }
+        const name = db ? [db.firstName, db.lastName].filter(Boolean).join(' ') : (r.fullName || r.name || '');
         return {
           ...r,
-          name: db ? [db.firstName, db.lastName].filter(Boolean).join(' ') || fullName : fullName,
+          name,
           title: db?.title || r.title || '',
           company: db?.companyName || r.company || '',
           location: db?.location || r.location || '',

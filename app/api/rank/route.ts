@@ -81,21 +81,28 @@ export async function POST(req: NextRequest) {
     let results: any[];
     const parseable = extractJsonArray(responseText);
     if (parseable) {
-      // Build a map of fullName -> candidate for reliable lookup
-      const byName = new Map(
-        candidates.map((c: any) => {
-          const full = [c.firstName, c.lastName].filter(Boolean).join(' ');
-          return [full.toLowerCase(), c];
-        })
-      );
+      // Use index-based lookup (index is 0-based from the prompt)
       results = parseable.map((r: any) => {
-        const fullName = r.fullName || '';
-        const db = byName.get(fullName.toLowerCase()) || null;
+        let db: any = null;
+        if (r.index != null) {
+          const idx = Number(r.index);
+          if (idx >= 0 && idx < candidates.length) db = candidates[idx];
+        }
+        // Fall back to fullName match
+        if (!db && r.fullName) {
+          const fn = (r.fullName || '').toLowerCase();
+          db = candidates.find((c: any) =>
+            [c.firstName, c.lastName].filter(Boolean).join(' ').toLowerCase() === fn
+          ) || null;
+        }
+        const name = db ? [db.firstName, db.lastName].filter(Boolean).join(' ') : (r.fullName || r.name || '');
         return {
-          ...r,
+          rank: r.rank,
+          score: r.score,
+          reason: r.reason,
           firstName: db?.firstName || '',
           lastName: db?.lastName || '',
-          name: db ? [db.firstName, db.lastName].filter(Boolean).join(' ') || fullName : fullName,
+          name,
           linkedInUrl: db?.linkedInUrl || '',
           description: db?.description || '',
           location: db?.location || '',
