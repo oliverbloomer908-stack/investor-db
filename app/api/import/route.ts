@@ -90,11 +90,12 @@ export async function POST(req: NextRequest) {
           if (seenUrls.has(linkedInUrl)) continue;
           seenUrls.add(linkedInUrl);
 
-          placeholders.push(`($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6}, $${paramIndex + 7}, $${paramIndex + 8}, $${paramIndex + 9}, $${paramIndex + 10}, $${paramIndex + 11}, NOW())`);
+          placeholders.push(`($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6}, $${paramIndex + 7}, $${paramIndex + 8}, $${paramIndex + 9}, $${paramIndex + 10}, $${paramIndex + 11}, $${paramIndex + 12}, NOW())`);
           values.push(
             linkedInUrl,
             inv.firstName || '',
             inv.lastName || '',
+            inv.displayName || '',
             inv.description || '',
             inv.location || '',
             inv.seniority || '',
@@ -105,16 +106,17 @@ export async function POST(req: NextRequest) {
             inv.domain || '',
             inv.email || null,
           );
-          paramIndex += 12;
+          paramIndex += 13;
         }
 
         if (placeholders.length === 0) return 0;
         await client.query(`
-          INSERT INTO investors (linkedInUrl, firstName, lastName, description, location, seniority, title, industries, companyName, companyDescription, domain, email, updatedAt)
+          INSERT INTO investors (linkedInUrl, firstName, lastName, displayName, description, location, seniority, title, industries, companyName, companyDescription, domain, email, updatedAt)
           VALUES ${placeholders.join(', ')}
           ON CONFLICT (linkedInUrl) DO UPDATE SET
             firstName = EXCLUDED.firstName,
             lastName = EXCLUDED.lastName,
+            displayName = EXCLUDED.displayName,
             description = EXCLUDED.description,
             location = EXCLUDED.location,
             seniority = EXCLUDED.seniority,

@@ -3,6 +3,7 @@ import { Investor } from '@/types';
 export interface ColumnMapping {
   firstName: string | null;
   lastName: string | null;
+  displayName: string | null;
   linkedInUrl: string | null;
   description: string | null;
   location: string | null;
@@ -17,7 +18,8 @@ export interface ColumnMapping {
 
 const FIELD_ALIASES: Record<string, string[]> = {
   firstName: ['first name', 'firstname', 'person first name', 'first', 'fname', 'given name', 'given_name', 'full name', 'fullname'],
-  lastName: ['last name', 'lastname', 'person last name', 'person name', 'last', 'lname', 'surname', 'family name', 'family_name', 'client last name'],
+  lastName: ['last name', 'lastname', 'person last name', 'last', 'lname', 'surname', 'family name', 'family_name', 'client last name'],
+  displayName: ['person name'],
   linkedInUrl: ['linkedin', 'linkedin url', 'linkedin profile', 'linkedin link', 'profile', 'person linkedin', 'person linkedin url', 'linkedinid', 'li_url', 'linkedin_profile', 'person linkedin profile'],
   description: ['description', 'person description', 'bio', 'about', 'summary', 'person bio', 'bio_short'],
   location: ['location', 'person location', 'city', 'address', 'region', 'person location'],
@@ -41,12 +43,12 @@ export function detectColumnsWithConfidence(headers: string[]): {
   confidence: Record<keyof ColumnMapping, number>;
 } {
   const mapping: ColumnMapping = {
-    firstName: null, lastName: null, linkedInUrl: null, description: null,
+    firstName: null, lastName: null, displayName: null, linkedInUrl: null, description: null,
     location: null, seniority: null, title: null, industries: null,
     companyName: null, companyDescription: null, domain: null, email: null,
   };
   const confidence: Record<keyof ColumnMapping, number> = {
-    firstName: 0, lastName: 0, linkedInUrl: 0, description: 0,
+    firstName: 0, lastName: 0, displayName: 0, linkedInUrl: 0, description: 0,
     location: 0, seniority: 0, title: 0, industries: 0,
     companyName: 0, companyDescription: 0, domain: 0, email: 0,
   };
@@ -129,6 +131,7 @@ export function mapRowToInvestor(row: Record<string, string>, mapping: ColumnMap
     linkedInUrl: get('linkedInUrl'),
     firstName: get('firstName'),
     lastName: get('lastName'),
+    displayName: get('displayName') || undefined,
     description: get('description'),
     location: get('location'),
     seniority: get('seniority'),

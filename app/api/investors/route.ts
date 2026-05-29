@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
 
     const db = getDb();
     const investors = (await db.prepare(
-      'SELECT id, linkedinurl AS "linkedInUrl", firstname AS "firstName", lastname AS "lastName", description, location, seniority, title, industries, companyname AS "companyName", companydescription AS "companyDescription", domain, email FROM investors ORDER BY firstname ASC LIMIT $1 OFFSET $2'
+      'SELECT id, linkedinurl AS "linkedInUrl", firstname AS "firstName", lastname AS "lastName", displayname AS "displayName", description, location, seniority, title, industries, companyname AS "companyName", companydescription AS "companyDescription", domain, email FROM investors ORDER BY firstname ASC LIMIT $1 OFFSET $2'
     ).all(limit, offset)) as any[];
 
     const countRow = (await db.prepare('SELECT COUNT(*) as count FROM investors').get()) as any;

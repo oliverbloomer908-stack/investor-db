@@ -3,6 +3,7 @@ export interface Investor {
   linkedInUrl: string;
   firstName: string;
   lastName: string;
+  displayName?: string;
   description: string;
   location: string;
   seniority: string;

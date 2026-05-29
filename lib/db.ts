@@ -49,6 +49,7 @@ export async function initDb() {
       linkedInUrl TEXT NOT UNIQUE,
       firstName TEXT,
       lastName TEXT,
+      displayName TEXT,
       description TEXT,
       location TEXT,
       seniority TEXT,
@@ -63,6 +64,8 @@ export async function initDb() {
       updatedAt TIMESTAMP DEFAULT NOW()
     )
   `);
+  // Add displayName column if it doesn't exist (for existing tables)
+  await pool.query(`DO $$ BEGIN ALTER TABLE investors ADD COLUMN displayName TEXT; EXCEPTION WHEN others THEN NULL; END $$`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_investors_location ON investors(location)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_investors_seniority ON investors(seniority)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_investors_industries ON investors(industries)`);

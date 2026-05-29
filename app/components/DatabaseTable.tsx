@@ -76,7 +76,7 @@ export default function DatabaseTable() {
               <tbody>
                 {filtered.map(inv => (
                   <tr key={inv.id} onClick={() => setSelectedInvestor(inv)} style={{ cursor: 'pointer' }}>
-                    <td>{inv.firstName} {inv.lastName}</td>
+                    <td>{inv.displayName || (inv.firstName + ' ' + inv.lastName).trim()}</td>
                     <td>{inv.title || '—'}</td>
                     <td>{inv.companyName || '—'}</td>
                     <td>{inv.location || '—'}</td>
