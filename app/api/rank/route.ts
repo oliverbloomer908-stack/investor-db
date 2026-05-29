@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     const params: any[] = [];
     let p = 1;
 
-    // Name is a hard database filter — search the full concatenated name
+    // Hard SQL filters
     if (filters?.name) {
       conditions.push(`LOWER(CONCAT(firstName, ' ', lastName)) LIKE $${p}`);
       params.push(`%${filters.name.toLowerCase()}%`);
@@ -36,6 +36,24 @@ export async function POST(req: NextRequest) {
     if (filters?.keyword) {
       conditions.push(`(description LIKE $${p} OR companyName LIKE $${p} OR title LIKE $${p})`);
       params.push(`%${filters.keyword}%`);
+      p += 1;
+    }
+
+    if (filters?.location) {
+      conditions.push(`(location LIKE $${p} OR location LIKE $${p + 1})`);
+      params.push(`%${filters.location}%`, `%${filters.location.replace(/,.*/, '')}%`);
+      p += 2;
+    }
+
+    if (filters?.seniority) {
+      conditions.push(`LOWER(seniority) = LOWER($${p})`);
+      params.push(filters.seniority);
+      p += 1;
+    }
+
+    if (filters?.industry) {
+      conditions.push(`industries LIKE $${p}`);
+      params.push(`%${filters.industry}%`);
       p += 1;
     }
 
@@ -52,11 +70,7 @@ export async function POST(req: NextRequest) {
       description: (c.description || '').slice(0, 300),
     }));
 
-    const prompt = buildRankingPrompt(query, truncated, Math.min(limit, candidates.length), {
-      location: filters?.location,
-      seniority: filters?.seniority,
-      industry: filters?.industry,
-    });
+    const prompt = buildRankingPrompt(query, truncated, Math.min(limit, candidates.length));
     const responseText = await chatCompletion([
       { role: 'user', content: prompt }
     ], { temperature: 0.3, max_tokens: 4000 });
