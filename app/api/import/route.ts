@@ -62,6 +62,9 @@ export async function POST(req: NextRequest) {
       const pool = new DB.Pool({ connectionString: process.env.DATABASE_URL! });
       const client = await pool.connect();
 
+      // Migration: add displayName column if it doesn't exist
+      await client.query(`DO $$ BEGIN ALTER TABLE investors ADD COLUMN displayName TEXT; EXCEPTION WHEN others THEN NULL; END $$`);
+
       const insertRows = async (batch: typeof rows): Promise<number> => {
         if (batch.length === 0) return 0;
         const values: any[] = [];
