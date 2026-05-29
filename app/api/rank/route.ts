@@ -74,8 +74,9 @@ export async function POST(req: NextRequest) {
 
     const prompt = buildRankingPrompt(query, truncated, Math.min(limit, candidates.length));
     const responseText = await chatCompletion([
+      { role: 'system', content: 'You must respond with ONLY a valid JSON array, no other text, no explanations, no markdown. Start with [ and end with ].' },
       { role: 'user', content: prompt }
-    ], { temperature: 0.3, max_tokens: 4000 });
+    ], { temperature: 0.1, max_tokens: 4000 });
 
     let results: any[];
     const parseable = extractJsonArray(responseText);

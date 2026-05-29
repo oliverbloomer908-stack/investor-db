@@ -71,8 +71,8 @@ export async function chatCompletion(
       }
       console.log('[minimax] content after tag strip:', withoutTags.slice(0, 300));
 
-      // Try to extract and parse a JSON object or array
-      const jsonMatch = withoutTags.match(/\{[\s\S]*\}/) || withoutTags.match(/\[[\s\S]*\]/);
+      // Try to extract and parse a JSON array or object
+      const jsonMatch = withoutTags.match(/\[[\s\S]*\]/) || withoutTags.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         try {
           const inner = JSON.parse(jsonMatch[0]);
