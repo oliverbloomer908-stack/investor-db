@@ -38,13 +38,12 @@ export async function GET(req: NextRequest) {
       LIMIT 10
     `).all() as { industry: string }[];
 
-    // Top 10 names — distinct full names (firstName + lastName), filter out entries where
-    // the fullname contains the lastName word (indicates bad source data where firstName = fullname)
+    // Top 10 names — distinct full names, skip rows where firstName == lastName
     const namesResult = await db.prepare(`
       SELECT DISTINCT TRIM(CONCAT(firstName, ' ', lastName)) as fullname
       FROM investors
       WHERE (firstName IS NOT NULL AND firstName != '')
-         OR (lastName IS NOT NULL AND lastName != '')
+        AND TRIM(LOWER(firstName)) != TRIM(LOWER(lastName))
       LIMIT 50
     `).all() as { fullname: string }[];
 

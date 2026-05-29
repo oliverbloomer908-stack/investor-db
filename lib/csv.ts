@@ -23,7 +23,7 @@ const FIELD_ALIASES: Record<string, string[]> = {
   location: ['location', 'person location', 'city', 'address', 'region', 'person location'],
   seniority: ['seniority', 'person seniority', 'level', 'seniority level', 'job level', 'c-level', 'executive level', 'person level', 'person seniority level'],
   title: ['title', 'person title', 'job title', 'job_title', 'position', 'role', 'designation', 'job_title'],
-  industries: ['industries', 'industry', 'sectors', 'sector', 'category', 'focus', 'ocean.io', 'industries (ocean.io)'],
+  industries: ['industries', 'industry', 'sectors', 'sector', 'category', 'focus', 'ocean.io', 'industries (ocean.io)', 'industries (third party)'],
   companyName: ['company', 'company name', 'organization', 'org', 'firm', 'employer', 'company organization', 'companyname', 'company keywords'],
   companyDescription: ['company description', 'org description', 'company bio', 'company about', 'companydescription'],
   domain: ['domain', 'website', 'company website', 'domain name', 'company website url', 'companywebsite'],
