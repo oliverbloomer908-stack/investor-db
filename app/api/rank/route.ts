@@ -4,13 +4,16 @@ import { buildRankingPrompt } from '@/lib/ranking';
 import { chatCompletion } from '@/lib/minimax';
 
 function extractJsonArray(text: string): any[] | null {
-  // Strip AI reasoning/thinking tags before parsing
-  const cleaned = text.replace(/<[^>]*>/g, '');
-  try { const p = JSON.parse(cleaned); if (Array.isArray(p)) return p; } catch {}
+  // Try direct parse first
+  try { const p = JSON.parse(text); if (Array.isArray(p)) return p; } catch {}
+  // Try extracting JSON array from anywhere in the text
+  const allArrayMatches = text.matchAll(/\[[\s\S]*?\]/g);
+  for (const match of allArrayMatches) {
+    try { const p = JSON.parse(match[0]); if (Array.isArray(p)) return p; } catch {}
+  }
+  // Try markdown code blocks
   const md = text.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/);
   if (md) { try { return JSON.parse(md[1]); } catch {} }
-  const bare = text.match(/\[[\s\S]*\]/);
-  if (bare) { try { return JSON.parse(bare[0]); } catch {} }
   return null;
 }
 
