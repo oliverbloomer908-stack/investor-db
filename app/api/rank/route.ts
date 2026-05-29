@@ -78,18 +78,32 @@ export async function POST(req: NextRequest) {
     let results: any[];
     const parseable = extractJsonArray(responseText);
     if (parseable) {
-      // Merge AI results with original DB candidate data so DetailPanel has all fields
-      const candidateByUrl = new Map(candidates.map(c => [c.linkedInUrl, c]));
+      // Merge AI results with original DB candidate data — use candidate index for reliable lookup
       results = parseable.map((r: any) => {
-        const db = candidateByUrl.get(r.linkedInUrl);
+        // Try candidate number (1-based) first, then URL, then name-based index
+        let db: any = null;
+        if (r.candidate != null) {
+          const idx = Number(r.candidate) - 1;
+          if (idx >= 0 && idx < candidates.length) db = candidates[idx];
+        }
+        if (!db && r.linkedInUrl) {
+          db = candidates.find((c: any) => c.linkedInUrl === r.linkedInUrl) || null;
+        }
+        if (!db && r.name) {
+          const idxMatch = String(r.name).match(/^Investor\s+(\d+)$/);
+          if (idxMatch) {
+            const idx = parseInt(idxMatch[1], 10) - 1;
+            if (idx >= 0 && idx < candidates.length) db = candidates[idx];
+          }
+        }
         return {
           ...r,
-          // Always use DB fields for accurate data (AI only echoes what it received)
           firstName: db?.firstName || '',
           lastName: db?.lastName || '',
           name: db
             ? [db.firstName, db.lastName].filter(Boolean).join(' ') || r.name
             : r.name,
+          linkedInUrl: db?.linkedInUrl || r.linkedInUrl || '',
           description: db?.description || r.description || '',
           location: db?.location || '',
           seniority: db?.seniority || '',

@@ -109,7 +109,33 @@ export async function POST(req: NextRequest) {
     let ranked: any[];
     const parseable = extractJsonArray(responseText);
     if (parseable) {
-      ranked = parseable;
+      // Merge with DB data using candidate index for reliable lookup
+      ranked = parseable.map((r: any) => {
+        let db: any = null;
+        if (r.candidate != null) {
+          const idx = Number(r.candidate) - 1;
+          if (idx >= 0 && idx < candidates.length) db = candidates[idx];
+        }
+        if (!db && r.linkedInUrl) {
+          db = candidates.find((c: any) => c.linkedInUrl === r.linkedInUrl) || null;
+        }
+        if (!db && r.name) {
+          const idxMatch = String(r.name).match(/^Investor\s+(\d+)$/);
+          if (idxMatch) {
+            const idx = parseInt(idxMatch[1], 10) - 1;
+            if (idx >= 0 && idx < candidates.length) db = candidates[idx];
+          }
+        }
+        return {
+          ...r,
+          name: db ? [db.firstName, db.lastName].filter(Boolean).join(' ') || r.name : (r.name || ''),
+          title: db?.title || r.title || '',
+          company: db?.companyName || r.company || '',
+          location: db?.location || r.location || '',
+          linkedInUrl: db?.linkedInUrl || r.linkedInUrl || '',
+          industries: db?.industries || r.industries || '',
+        };
+      });
     } else {
       return NextResponse.json({ error: 'Failed to parse AI response', raw: responseText.slice(0, 500) }, { status: 500 });
     }
@@ -119,7 +145,7 @@ export async function POST(req: NextRequest) {
       'rank,name,title,company,location,linkedInUrl,industries,reason,score'
     ];
     for (const r of ranked) {
-      const name = r.name || [r.firstName, r.lastName].filter(Boolean).join(' ') || '';
+      const name = r.name || '';
       const title = r.title || '';
       const company = r.company || '';
       const location = r.location || '';
