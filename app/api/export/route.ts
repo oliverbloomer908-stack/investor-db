@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
     }
 
     const db = getDb();
-    const sql = `SELECT linkedInUrl, firstName, lastName, description, location, seniority, title, industries, companyName, companyDescription, domain, email
+    const sql = `SELECT linkedinurl AS "linkedInUrl", firstname AS "firstName", lastname AS "lastName", description, location, seniority, title, industries, companyname AS "companyName", companydescription AS "companyDescription", domain, email
       FROM investors WHERE ${conditions.join(' AND ')} LIMIT 500`;
     const candidates = (await db.prepare(sql).all(...params)) as any[];
 
